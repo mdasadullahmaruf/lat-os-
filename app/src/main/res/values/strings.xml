@@ -1,1 +1,9 @@
-
+<resources>
+    <string name="app_name">Lat OS</string>
+    <string name="accessibility_service_description">Lat OS uses accessibility to control your screen with voice commands. No data is collected or sent online.</string>
+    <string name="permission_required">Permission Required</string>
+    <string name="grant_accessibility">Please enable Lat OS in Accessibility settings to control your screen with voice.</string>
+    <string name="grant_microphone">Please allow microphone access for voice commands.</string>
+    <string name="listening">Listening...</string>
+    <string name="processing">Processing...</string>
+</resources>
