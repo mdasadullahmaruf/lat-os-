@@ -3,53 +3,154 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:padding="24dp"
-    android:gravity="center"
+    android:padding="16dp"
     android:background="@color/black">
 
+    <!-- Header -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Lat OS"
-        android:textSize="48sp"
+        android:textSize="36sp"
         android:textColor="@color/white"
         android:textStyle="bold"
-        android:layout_marginBottom="8dp"/>
+        android:layout_gravity="center_horizontal"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Voice-Powered AI Assistant"
-        android:textSize="16sp"
+        android:textSize="14sp"
         android:textColor="@color/teal_200"
-        android:layout_marginBottom="48dp"/>
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="16dp"/>
 
+    <!-- Control Buttons -->
     <Button
         android:id="@+id/btnGrantPermissions"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Grant Permissions"
-        android:textSize="16sp"
-        android:padding="16dp"
-        android:layout_marginBottom="16dp"/>
+        android:textSize="14sp"
+        android:padding="12dp"
+        android:layout_marginBottom="8dp"/>
 
     <Button
         android:id="@+id/btnStartListening"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Start Voice Control"
-        android:textSize="16sp"
-        android:padding="16dp"
+        android:text:textSize="14Size="14sp"
+        android:padding="12dp"
         android:enabled="false"
-        android:layout_marginBottom="16dp"/>
+        android:layout_marginBottom="8dp"/>
 
+    <Button
+        android:id="@+id/btnStopListening"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Stop Voice Control"
+        android:textSize="14sp"
+        android:padding="12dp"
+        android:visibility="gone"
+        android:layout_marginBottom="8dp"/>
+
+    <!-- Status -->
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Waiting for permissions..."
-        android:textSize="14sp"
+        android:textSize="13sp"
         android:textColor="@color/white"
-        android:layout_marginTop="24dp"/>
+        android:layout_gravity="center_horizontal"
+        android:layout_marginBottom="12dp"/>
+
+    <!-- Log Output -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Command Log:"
+        android:textSize="12sp"
+        android:textColor="@color/purple_200"
+        android:textStyle="bold"/>
+
+    <ScrollView
+        android:id="@+id/scrollLog"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:background="#1A1A1A"
+        android:padding="8dp"
+        android:layout_marginBottom="12dp">
+
+        <TextView
+            android:id="@+id/tvLog"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:textColor="@color/teal_200"
+            android:textSize="11sp"
+            android:fontFamily="monospace"
+            android:text="[System] Lat OS initialized\n"/>
+    </ScrollView>
+
+    <Button
+        android:id="@+id/btnClearLog"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Clear Log"
+        android:textSize="11sp"
+        android:layout_gravity="end"
+        android:layout_marginBottom="8dp"/>
+
+    <!-- Manual Command Bar -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Manual Command Test:"
+        android:textSize="12sp"
+        android:textColor="@color/purple_200"
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp"/>
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <EditText
+            android:id="@+id/etCommand"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="Type command here..."
+            android:textColor="@color/white"
+            android:textColorHint="#666666"
+            android:background="@drawable/command_input_bg"
+            android:padding="12dp"
+            android:textSize="14sp"
+            android:inputType="text"
+            android:imeOptions="actionSend"/>
+
+        <ImageButton
+            android:id="@+id/btnSendCommand"
+            android:layout_width="48dp"
+            android:layout_height="48dp"
+            android:src="@drawable/ic_microphone"
+            android:tint="@color/white"
+            android:background="@drawable/send_button_bg"
+            android:layout_marginStart="8dp"/>
+    </LinearLayout>
+
+    <!-- Command Examples -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="Try: Open YouTube | Search cats | Call 123"
+        android:textSize="10sp"
+        android:textColor="#666666"
+        android:layout_gravity="center_horizontal"
+        android:layout_marginTop="4dp"/>
 
 </LinearLayout>
