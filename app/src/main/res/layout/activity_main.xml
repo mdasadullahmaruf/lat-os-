@@ -4,82 +4,268 @@
     android:layout_height="match_parent"
     android:orientation="vertical"
     android:padding="16dp"
+    android:gravity="center_horizontal"
     android:background="@color/black">
 
+    <!-- App Title -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="Lat OS"
-        android:textSize="36sp"
+        android:textSize="48sp"
         android:textColor="@color/white"
         android:textStyle="bold"
-        android:layout_gravity="center_horizontal"/>
+        android:layout_marginBottom="4dp"/>
 
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Voice-Powered AI Assistant"
+        android:text="Hands-Free Voice Control"
         android:textSize="14sp"
         android:textColor="@color/teal_200"
-        android:layout_gravity="center_horizontal"
         android:layout_marginBottom="16dp"/>
 
+    <!-- Assistant Status -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal"
+        android:gravity="center_vertical"
+        android:layout_marginBottom="8dp">
+        
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="Enable Assistant"
+            android:textSize="18sp"
+            android:textColor="@color/white"
+            android:textStyle="bold"/>
+        
+        <Switch
+            android:id="@+id/swAssistant"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"/>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="Assistant stopped"
+        android:textSize="12sp"
+        android:textColor="#FF4444"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- Wake Word Info -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:background="#1A1A1A"
+        android:padding="12dp"
+        android:layout_marginBottom="12dp">
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🎤 Wake Word"
+            android:textSize="14sp"
+            android:textColor="#4CAF50"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text='Say "Hey Phone" to activate'
+            android:textSize="14sp"
+            android:textColor="@color/white"/>
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Or tap the floating button"
+            android:textSize="12sp"
+            android:textColor="#888888"/>
+    </LinearLayout>
+
+    <!-- Permissions & Settings Button -->
     <Button
         android:id="@+id/btnGrantPermissions"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Grant Permissions"
+        android:text="⚙ PERMISSIONS &amp; SETTINGS"
         android:textSize="14sp"
-        android:padding="12dp"
-        android:layout_marginBottom="8dp"/>
+        android:textStyle="bold"
+        android:padding="14dp"
+        android:layout_marginBottom="8dp"
+        android:backgroundTint="#333333"/>
 
+    <!-- Conversation History Button -->
     <Button
-        android:id="@+id/btnStartListening"
+        android:id="@+id/btnHistory"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Start Voice Control"
+        android:text="📋 CONVERSATION HISTORY"
         android:textSize="14sp"
-        android:padding="12dp"
-        android:enabled="false"
-        android:layout_marginBottom="8dp"/>
+        android:textStyle="bold"
+        android:padding="14dp"
+        android:layout_marginBottom="16dp"
+        android:backgroundTint="#333333"/>
 
-    <Button
-        android:id="@+id/btnStopListening"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Stop Voice Control"
-        android:textSize="14sp"
-        android:padding="12dp"
-        android:visibility="gone"
-        android:layout_marginBottom="8dp"/>
-    
-    <Button
-        android:id="@+id/btnScanApps"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Scan My Apps"
-        android:textSize="14sp"
-        android:padding="12dp"
-        android:layout_marginBottom="8dp"/>
-    
-
+    <!-- Note about Vosk model -->
     <TextView
-        android:id="@+id/tvStatus"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="⚠ Note: Vosk model required for wake word. Place 'vosk-model-small-en-us-0.15' in app's external files folder."
+        android:textSize="11sp"
+        android:textColor="#FF9800"
+        android:layout_marginBottom="16dp"/>
+
+    <!-- App Scanner Section -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="12dp">
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="📱 App Scanner"
+            android:textSize="16sp"
+            android:textColor="#4CAF50"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Scans ALL installed apps including YouTube, WhatsApp etc."
+            android:textSize="12sp"
+            android:textColor="#AAAAAA"
+            android:layout_marginBottom="8dp"/>
+        
+        <Button
+            android:id="@+id/btnScanApps"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🔍 SCAN ALL INSTALLED APPS"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:padding="14dp"
+            android:backgroundTint="#2196F3"/>
+    </LinearLayout>
+
+    <!-- Test Voice Command Section -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="12dp">
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🎤 Test Voice Command"
+            android:textSize="16sp"
+            android:textColor="#4CAF50"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Type any command to test without speaking"
+            android:textSize="12sp"
+            android:textColor="#AAAAAA"
+            android:layout_marginBottom="8dp"/>
+        
+        <EditText
+            android:id="@+id/etCommand"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="e.g. open youtube"
+            android:textColor="@color/white"
+            android:textColorHint="#666666"
+            android:background="#222222"
+            android:padding="12dp"
+            android:textSize="14sp"
+            android:inputType="text"
+            android:imeOptions="actionSend"
+            android:maxLines="1"
+            android:layout_marginBottom="8dp"/>
+        
+        <Button
+            android:id="@+id/btnSendCommand"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="▶ RUN TEST COMMAND"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:padding="14dp"
+            android:backgroundTint="#9C27B0"/>
+    </LinearLayout>
+
+    <!-- Test App Finder Section -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_marginBottom="12dp">
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="🔎 Test App Finder"
+            android:textSize="16sp"
+            android:textColor="#4CAF50"
+            android:textStyle="bold"
+            android:layout_marginBottom="4dp"/>
+        
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Test if the app can find a specific app by name"
+            android:textSize="12sp"
+            android:textColor="#AAAAAA"
+            android:layout_marginBottom="8dp"/>
+        
+        <EditText
+            android:id="@+id/etTestApp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="e.g. youtube"
+            android:textColor="@color/white"
+            android:textColorHint="#666666"
+            android:background="#222222"
+            android:padding="12dp"
+            android:textSize="14sp"
+            android:inputType="text"
+            android:maxLines="1"
+            android:layout_marginBottom="8dp"/>
+        
+        <Button
+            android:id="@+id/btnTestFinder"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="🔍 FIND THIS APP"
+            android:textSize="14sp"
+            android:textStyle="bold"
+            android:padding="14dp"
+            android:backgroundTint="#009688"/>
+    </LinearLayout>
+
+    <!-- Log Output -->
+    <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Waiting for permissions..."
-        android:textSize="13sp"
+        android:text="📋 Log Output"
+        android:textSize="14sp"
         android:textColor="@color/white"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginBottom="12dp"/>
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Command Log:"
-        android:textSize="12sp"
-        android:textColor="@color/purple_200"
-        android:textStyle="bold"/>
+        android:textStyle="bold"
+        android:layout_marginBottom="4dp"/>
 
     <ScrollView
         android:id="@+id/scrollLog"
@@ -87,76 +273,26 @@
         android:layout_height="0dp"
         android:layout_weight="1"
         android:background="#1A1A1A"
-        android:padding="8dp"
-        android:layout_marginBottom="12dp">
-
+        android:padding="8dp">
+        
         <TextView
             android:id="@+id/tvLog"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:textColor="@color/teal_200"
+            android:text=""
             android:textSize="11sp"
-            android:fontFamily="monospace"
-            android:text="[System] Lat OS initialized&#10;"/>
+            android:textColor="#00FF00"
+            android:fontFamily="monospace"/>
     </ScrollView>
 
     <Button
         android:id="@+id/btnClearLog"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Clear Log"
-        android:textSize="11sp"
-        android:layout_gravity="end"
-        android:layout_marginBottom="8dp"/>
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Manual Command Test:"
-        android:textSize="12sp"
-        android:textColor="@color/purple_200"
-        android:textStyle="bold"
-        android:layout_marginBottom="4dp"/>
-
-    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:orientation="horizontal"
-        android:gravity="center_vertical">
-
-        <EditText
-            android:id="@+id/etCommand"
-            android:layout_width="0dp"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
-            android:hint="Type command here..."
-            android:textColor="@color/white"
-            android:textColorHint="#666666"
-            android:background="@drawable/command_input_bg"
-            android:padding="12dp"
-            android:textSize="14sp"
-            android:inputType="text"
-            android:imeOptions="actionSend"
-            android:maxLines="1"/>
-
-        <Button
-            android:id="@+id/btnSendCommand"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:text="SEND"
-            android:textSize="12sp"
-            android:textStyle="bold"
-            android:padding="12dp"
-            android:layout_marginStart="8dp"/>
-    </LinearLayout>
-
-    <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Try: Open YouTube | Search cats | Call 123"
-        android:textSize="10sp"
-        android:textColor="#666666"
-        android:layout_gravity="center_horizontal"
-        android:layout_marginTop="4dp"/>
+        android:text="🗑 CLEAR LOG"
+        android:textSize="12sp"
+        android:padding="10dp"
+        android:layout_marginTop="8dp"
+        android:backgroundTint="#555555"/>
 
 </LinearLayout>
