@@ -6,12 +6,22 @@ import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
 import android.content.Intent
+import android.graphics.PixelFormat
 import android.os.Bundle
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
 import android.speech.SpeechRecognizer
 import android.util.Log
+import android.view.Gravity
+import android.view.LayoutInflater
+import android.view.View
+import android.view.WindowManager
+import android.widget.ImageView
+import android.widget.TextView
+import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import java.util.Locale
 
@@ -22,15 +32,19 @@ class VoiceService : Service() {
     private var speechRecognizer: SpeechRecognizer? = null
     private lateinit var intentEngine: IntentEngine
     private lateinit var deepLinkRouter: DeepLinkRouter
-    private lateinit var accessibilityExecutor: AccessibilityExecutor
+    private lateinit var windowManager: WindowManager
+    private var floatingView: View? = null
+    private var statusText: TextView? = null
+    private var micIcon: ImageView? = null
+    private val handler = Handler(Looper.getMainLooper())
 
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
         intentEngine = IntentEngine()
         deepLinkRouter = DeepLinkRouter(this)
+        windowManager = getSystemService(WINDOW_SERVICE) as WindowManager
         
-        // Initialize speech recognizer
         if (SpeechRecognizer.isRecognitionAvailable(this)) {
             speechRecognizer = SpeechRecognizer.createSpeechRecognizer(this)
             setupRecognitionListener()
@@ -40,10 +54,8 @@ class VoiceService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         val notification = createNotification()
         startForeground(1, notification)
-
-        // Start listening for voice commands
+        showFloatingUI()
         startListening()
-
         return START_STICKY
     }
 
@@ -52,39 +64,94 @@ class VoiceService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         speechRecognizer?.destroy()
+        removeFloatingUI()
+    }
+
+    private fun showFloatingUI() {
+        val params = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.WRAP_CONTENT,
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
+            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE,
+            PixelFormat.TRANSLUCENT
+        ).apply {
+            gravity = Gravity.TOP or Gravity.CENTER_HORIZONTAL
+            y = 100
+        }
+
+        floatingView = LayoutInflater.from(this).inflate(R.layout.floating_status, null)
+        statusText = floatingView?.findViewById(R.id.tvFloatingStatus)
+        micIcon = floatingView?.findViewById(R.id.ivFloatingMic)
+        
+        windowManager.addView(floatingView, params)
+        updateStatus("Tap mic and speak", R.color.white)
+    }
+
+    private fun removeFloatingUI() {
+        floatingView?.let {
+            windowManager.removeView(it)
+            floatingView = null
+        }
+    }
+
+    private fun updateStatus(text: String, colorRes: Int) {
+        handler.post {
+            statusText?.text = text
+            statusText?.setTextColor(getColor(colorRes))
+        }
+    }
+
+    private fun pulseMic() {
+        handler.post {
+            micIcon?.animate()?.scaleX(1.3f)?.scaleY(1.3f)?.setDuration(300)?.withEndAction {
+                micIcon?.animate()?.scaleX(1f)?.scaleY(1f)?.setDuration(300)?.start()
+            }?.start()
+        }
     }
 
     private fun setupRecognitionListener() {
         speechRecognizer?.setRecognitionListener(object : RecognitionListener {
             override fun onReadyForSpeech(params: Bundle?) {
                 Log.d(TAG, "Ready for speech")
+                updateStatus("🎤 Listening...", R.color.teal_200)
             }
 
             override fun onBeginningOfSpeech() {
                 Log.d(TAG, "Beginning of speech")
+                updateStatus("🔴 Hearing you...", R.color.teal_200)
+                pulseMic()
             }
 
-            override fun onRmsChanged(rmsdB: Float) {}
+            override fun onRmsChanged(rmsdB: Float) {
+                // Visual feedback based on volume could go here
+            }
 
             override fun onBufferReceived(buffer: ByteArray?) {}
 
             override fun onEndOfSpeech() {
                 Log.d(TAG, "End of speech")
-                // Restart listening after a short delay
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    if (speechRecognizer != null) {
-                        startListening()
-                    }
-                }, 1500)
+                updateStatus("⏳ Processing...", R.color.purple_200)
             }
 
             override fun onError(error: Int) {
-                Log.e(TAG, "Speech recognition error: $error")
-                // Restart listening on error
-                android.os.Handler(android.os.Looper.getMainLooper()).postDelayed({
-                    if (speechRecognizer != null) {
-                        startListening()
-                    }
+                val errorMsg = when (error) {
+                    SpeechRecognizer.ERROR_AUDIO -> "Audio error"
+                    SpeechRecognizer.ERROR_CLIENT -> "Client error"
+                    SpeechRecognizer.ERROR_INSUFFICIENT_PERMISSIONS -> "No mic permission"
+                    SpeechRecognizer.ERROR_NETWORK -> "Network error"
+                    SpeechRecognizer.ERROR_NETWORK_TIMEOUT -> "Network timeout"
+                    SpeechRecognizer.ERROR_NO_MATCH -> "Didn't catch that"
+                    SpeechRecognizer.ERROR_RECOGNIZER_BUSY -> "Busy, retrying..."
+                    SpeechRecognizer.ERROR_SERVER -> "Server error"
+                    SpeechRecognizer.ERROR_SPEECH_TIMEOUT -> "No speech detected"
+                    else -> "Error $error"
+                }
+                Log.e(TAG, "Error: $errorMsg")
+                updateStatus("❌ $errorMsg", android.R.color.holo_red_light)
+                
+                handler.postDelayed({
+                    updateStatus("🎤 Tap to speak", R.color.white)
+                    startListening()
                 }, 2000)
             }
 
@@ -92,12 +159,21 @@ class VoiceService : Service() {
                 val matches = results?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
                 if (!matches.isNullOrEmpty()) {
                     val command = matches[0]
-                    Log.d(TAG, "Recognized: $command")
+                    Log.d(TAG, "Heard: $command")
+                    updateStatus("✅ Heard: \"$command\"", R.color.teal_200)
                     processCommand(command)
+                } else {
+                    updateStatus("❌ No speech detected", android.R.color.holo_red_light)
+                    handler.postDelayed({ startListening() }, 1500)
                 }
             }
 
-            override fun onPartialResults(partialResults: Bundle?) {}
+            override fun onPartialResults(partialResults: Bundle?) {
+                val partial = partialResults?.getStringArrayList(SpeechRecognizer.RESULTS_RECOGNITION)
+                if (!partial.isNullOrEmpty()) {
+                    updateStatus("...${partial[0]}", R.color.purple_200)
+                }
+            }
 
             override fun onEvent(eventType: Int, params: Bundle?) {}
         })
@@ -107,8 +183,8 @@ class VoiceService : Service() {
         val intent = Intent(RecognizerIntent.ACTION_RECOGNIZE_SPEECH).apply {
             putExtra(RecognizerIntent.EXTRA_LANGUAGE_MODEL, RecognizerIntent.LANGUAGE_MODEL_FREE_FORM)
             putExtra(RecognizerIntent.EXTRA_LANGUAGE, Locale.getDefault())
-            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, false)
-            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
+            putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
+            putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 3)
         }
         speechRecognizer?.startListening(intent)
     }
@@ -117,46 +193,65 @@ class VoiceService : Service() {
         val intent = intentEngine.parseCommand(command)
         
         if (intent != null) {
-            Log.d(TAG, "Action: ${intent.action}, Target: ${intent.target}, Query: ${intent.query}")
+            updateStatus("🚀 ${intent.action}: ${intent.query}", R.color.teal_200)
             
             when (intent.action) {
                 "open_app" -> {
                     if (intent.target.isNotEmpty()) {
-                        val success = deepLinkRouter.openApp(intent.target)
-                        if (!success) {
-                            // Try as package name directly
-                            try {
-                                val launchIntent = packageManager.getLaunchIntentForPackage(intent.target)
-                                launchIntent?.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                launchIntent?.let { startActivity(it) }
-                            } catch (e: Exception) {
-                                Log.e(TAG, "Failed to open app: ${e.message}")
+                        handler.postDelayed({
+                            val success = deepLinkRouter.openApp(intent.target)
+                            if (success) {
+                                updateStatus("✅ Opened!", R.color.teal_200)
+                                showToast("Opened ${intent.target}")
+                            } else {
+                                updateStatus("❌ App not found", android.R.color.holo_red_light)
                             }
-                        }
+                            handler.postDelayed({ startListening() }, 2000)
+                        }, 500)
                     }
                 }
                 
                 "search" -> {
-                    when {
-                        intent.target.contains("youtube") -> deepLinkRouter.searchYouTube(intent.query)
-                        intent.target.contains("chrome") || intent.target.contains("google") -> deepLinkRouter.searchGoogle(intent.query)
-                        else -> deepLinkRouter.searchGoogle(intent.query)
-                    }
+                    handler.postDelayed({
+                        when {
+                            intent.target.contains("youtube") -> {
+                                deepLinkRouter.searchYouTube(intent.query)
+                                updateStatus("✅ Searching YouTube", R.color.teal_200)
+                            }
+                            else -> {
+                                deepLinkRouter.searchGoogle(intent.query)
+                                updateStatus("✅ Searching Google", R.color.teal_200)
+                            }
+                        }
+                        handler.postDelayed({ startListening() }, 2000)
+                    }, 500)
                 }
                 
                 "call" -> {
-                    deepLinkRouter.callNumber(intent.query)
+                    handler.postDelayed({
+                        deepLinkRouter.callNumber(intent.query)
+                        updateStatus("✅ Dialing ${intent.query}", R.color.teal_200)
+                        handler.postDelayed({ startListening() }, 2000)
+                    }, 500)
                 }
                 
-                "tap", "type", "scroll", "media" -> {
-                    // These require accessibility service
-                    // For now, show a toast or notification
-                    // Full implementation needs accessibility service connection
-                    Log.d(TAG, "Accessibility action: ${intent.action} - ${intent.query}")
+                else -> {
+                    updateStatus("⚠️ Command not yet supported", android.R.color.holo_orange_light)
+                    handler.postDelayed({ startListening() }, 2000)
                 }
             }
         } else {
-            Log.d(TAG, "Could not understand command: $command")
+            updateStatus("❓ Didn't understand: \"$command\"", android.R.color.holo_orange_light)
+            handler.postDelayed({
+                updateStatus("🎤 Try: Open YouTube", R.color.white)
+                startListening()
+            }, 2500)
+        }
+    }
+
+    private fun showToast(message: String) {
+        handler.post {
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
         }
     }
 
@@ -180,7 +275,7 @@ class VoiceService : Service() {
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle("Lat OS")
-            .setContentText("Listening for voice commands...")
+            .setContentText("Voice assistant active")
             .setSmallIcon(android.R.drawable.ic_btn_speak_now)
             .setContentIntent(pendingIntent)
             .build()
