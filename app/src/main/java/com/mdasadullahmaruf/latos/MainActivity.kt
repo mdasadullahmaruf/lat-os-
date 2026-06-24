@@ -37,11 +37,9 @@ class MainActivity : AppCompatActivity() {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
 
-        // Initialize engines
         intentEngine = IntentEngine()
         deepLinkRouter = DeepLinkRouter(this)
 
-        // Find views
         btnGrantPermissions = findViewById(R.id.btnGrantPermissions)
         btnStartListening = findViewById(R.id.btnStartListening)
         btnStopListening = findViewById(R.id.btnStopListening)
@@ -52,7 +50,6 @@ class MainActivity : AppCompatActivity() {
         btnSendCommand = findViewById(R.id.btnSendCommand)
         btnClearLog = findViewById(R.id.btnClearLog)
 
-        // Button listeners
         btnGrantPermissions.setOnClickListener {
             checkAndRequestPermissions()
         }
@@ -73,7 +70,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
 
-        // Also trigger on keyboard "Done" or "Enter" key
         etCommand.setOnEditorActionListener { _, actionId, _ ->
             if (actionId == EditorInfo.IME_ACTION_SEND) {
                 val command = etCommand.text.toString().trim()
@@ -158,7 +154,6 @@ class MainActivity : AppCompatActivity() {
         updateUI()
     }
 
-    // Manual command execution for testing
     private fun executeCommand(command: String) {
         addLog("You typed: \"$command\"")
 
@@ -170,14 +165,18 @@ class MainActivity : AppCompatActivity() {
             when (intent.action) {
                 "open_app" -> {
                     if (intent.target.isNotEmpty()) {
+                        val foundPkg = PackageMapper.findPackage(this, intent.target)
+                        addLog("Looking for app: ${intent.target}")
+                        addLog("Found package: $foundPkg")
+
                         val success = deepLinkRouter.openApp(intent.target)
                         if (success) {
-                            addLog("SUCCESS: Opened app ${intent.target}")
+                            addLog("SUCCESS: Opened ${intent.target}")
                         } else {
                             addLog("FAILED: App not found - ${intent.target}")
                         }
                     } else {
-                        addLog("FAILED: No app specified")
+                        addLog("FAILED: No app name detected")
                     }
                 }
 
@@ -199,28 +198,13 @@ class MainActivity : AppCompatActivity() {
                     addLog("SUCCESS: Dialing ${intent.query}")
                 }
 
-                "tap" -> {
-                    addLog("INFO: Tap command requires Accessibility Service")
-                    addLog("Target: ${intent.query}")
-                }
-
-                "type" -> {
-                    addLog("INFO: Type command requires Accessibility Service")
-                    addLog("Text: ${intent.query}")
-                }
-
-                "scroll" -> {
-                    addLog("INFO: Scroll command requires Accessibility Service")
-                    addLog("Direction: ${intent.query}")
-                }
-
                 else -> {
                     addLog("INFO: Command '${intent.action}' not yet implemented")
                 }
             }
         } else {
             addLog("FAILED: Could not understand command")
-            addLog("Try: 'Open YouTube' or 'Search cats on Google'")
+            addLog("Try: 'Open YouTube' or 'Search cats'")
         }
     }
 
