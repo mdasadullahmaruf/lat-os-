@@ -6,7 +6,6 @@
     android:padding="16dp"
     android:background="@color/black">
 
-    <!-- Header -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -25,7 +24,6 @@
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="16dp"/>
 
-    <!-- Control Buttons -->
     <Button
         android:id="@+id/btnGrantPermissions"
         android:layout_width="match_parent"
@@ -40,7 +38,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:text="Start Voice Control"
-        android:text:textSize="14Size="14sp"
+        android:textSize="14sp"
         android:padding="12dp"
         android:enabled="false"
         android:layout_marginBottom="8dp"/>
@@ -55,7 +53,6 @@
         android:visibility="gone"
         android:layout_marginBottom="8dp"/>
 
-    <!-- Status -->
     <TextView
         android:id="@+id/tvStatus"
         android:layout_width="wrap_content"
@@ -66,7 +63,6 @@
         android:layout_gravity="center_horizontal"
         android:layout_marginBottom="12dp"/>
 
-    <!-- Log Output -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -91,7 +87,7 @@
             android:textColor="@color/teal_200"
             android:textSize="11sp"
             android:fontFamily="monospace"
-            android:text="[System] Lat OS initialized\n"/>
+            android:text="[System] Lat OS initialized&#10;"/>
     </ScrollView>
 
     <Button
@@ -103,7 +99,6 @@
         android:layout_gravity="end"
         android:layout_marginBottom="8dp"/>
 
-    <!-- Manual Command Bar -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
@@ -143,7 +138,6 @@
             android:layout_marginStart="8dp"/>
     </LinearLayout>
 
-    <!-- Command Examples -->
     <TextView
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
