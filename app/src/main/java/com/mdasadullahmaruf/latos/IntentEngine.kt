@@ -1,5 +1,9 @@
 package com.mdasadullahmaruf.latos
 
+/**
+ * Intent classifier - extracts command and app name
+ * FIXED: More robust parsing, handles edge cases
+ */
 class IntentEngine {
 
     data class Intent(
@@ -10,67 +14,101 @@ class IntentEngine {
 
     fun parseCommand(text: String): Intent? {
         val lower = text.lowercase().trim()
-
+        
+        // Remove extra whitespace and punctuation
+        val clean = lower.replace(Regex("[^a-z0-9 ]"), " ").replace(Regex("\\s+"), " ").trim()
+        
         return when {
-            lower.contains("open") || lower.contains("launch") -> {
-                val appName = extractAfterCommand(lower, listOf("open", "launch"))
-                Intent("open_app", appName, "")
+            // Open / Launch commands
+            clean.startsWith("open") || clean.startsWith("launch") || clean.startsWith("start") -> {
+                val appName = clean.removePrefix("open").removePrefix("launch").removePrefix("start").trim()
+                if (appName.isNotEmpty()) {
+                    Intent("open_app", appName, "")
+                } else null
             }
 
-            lower.contains("search") || lower.contains("find") -> {
-                val (app, query) = extractSearchQuery(lower)
+            // Search commands
+            clean.startsWith("search") || clean.startsWith("find") || clean.startsWith("look up") || clean.startsWith("google") -> {
+                val remaining = clean.removePrefix("search").removePrefix("find").removePrefix("look up").removePrefix("google").trim()
+                
+                // Check if search is for a specific app: "search youtube for cats" or "search cats on youtube"
+                val app = extractAppFromSearch(remaining)
+                val query = extractQueryFromSearch(remaining, app)
+                
                 Intent("search", app, query)
             }
 
-            lower.contains("call") -> {
-                val contact = extractAfterCommand(lower, listOf("call"))
+            // Call commands
+            clean.startsWith("call") || clean.startsWith("dial") || clean.startsWith("phone") -> {
+                val contact = clean.removePrefix("call").removePrefix("dial").removePrefix("phone").trim()
                 Intent("call", "phone", contact)
             }
 
-            lower.contains("tap") || lower.contains("click") -> {
-                val target = extractAfterCommand(lower, listOf("tap", "click", "press"))
+            // Tap / Click commands
+            clean.startsWith("tap") || clean.startsWith("click") || clean.startsWith("press") -> {
+                val target = clean.removePrefix("tap").removePrefix("click").removePrefix("press").trim()
                 Intent("tap", "", target)
             }
 
-            lower.contains("type") || lower.contains("write") -> {
-                val text = extractAfterCommand(lower, listOf("type", "write", "enter"))
+            // Type / Write commands
+            clean.startsWith("type") || clean.startsWith("write") || clean.startsWith("enter") || clean.startsWith("input") -> {
+                val text = clean.removePrefix("type").removePrefix("write").removePrefix("enter").removePrefix("input").trim()
                 Intent("type", "", text)
             }
 
-            lower.contains("scroll down") || lower.contains("swipe up") -> {
+            // Scroll commands
+            clean.contains("scroll down") || clean.contains("swipe up") -> {
                 Intent("scroll", "", "down")
             }
-
-            lower.contains("scroll up") || lower.contains("swipe down") -> {
+            clean.contains("scroll up") || clean.contains("swipe down") -> {
                 Intent("scroll", "", "up")
             }
 
-            else -> null
+            // Default: if it looks like just an app name, try to open it
+            else -> {
+                // If single word or short phrase, assume it's an app name
+                if (clean.split(" ").size <= 3 && clean.length < 30) {
+                    Intent("open_app", clean, "")
+                } else {
+                    // Otherwise treat as search
+                    Intent("search", "", clean)
+                }
+            }
         }
     }
 
-    private fun extractAfterCommand(text: String, commands: List<String>): String {
-        var result = text
-        for (cmd in commands) {
-            result = result.replace(cmd, "")
+    private fun extractAppFromSearch(text: String): String {
+        // Patterns: "search cats on youtube", "search youtube for cats", "youtube search cats"
+        val patterns = listOf(
+            Regex("on (\\w+)$"),
+            Regex("for (\\w+)$"),
+            Regex("^(\\w+) search"),
+            Regex("^(\\w+) for")
+        )
+        
+        for (pattern in patterns) {
+            pattern.find(text)?.groupValues?.get(1)?.let { return it }
         }
-        return result.trim()
+        
+        // Check for known app names in the text
+        val knownApps = listOf("youtube", "google", "maps", "chrome", "browser", "gmail", "spotify", "netflix", "amazon", "flipkart")
+        for (app in knownApps) {
+            if (text.contains(app)) return app
+        }
+        
+        return ""
     }
 
-    private fun extractSearchQuery(text: String): Pair<String, String> {
-        var app = ""
+    private fun extractQueryFromSearch(text: String, app: String): String {
         var query = text
-
-        if (text.contains("on youtube") || text.contains("youtube")) {
-            app = "youtube"
-            query = extractAfterCommand(text, listOf("search", "find", "on youtube", "youtube"))
-        } else if (text.contains("on google") || text.contains("google")) {
-            app = "google"
-            query = extractAfterCommand(text, listOf("search", "find", "on google", "google"))
-        } else {
-            query = extractAfterCommand(text, listOf("search", "find"))
+        if (app.isNotEmpty()) {
+            query = query.replace("on $app", "")
+                .replace("for $app", "")
+                .replace("$app search", "")
+                .replace("$app for", "")
+                .replace(app, "")
+                .trim()
         }
-
-        return Pair(app, query.trim())
+        return query
     }
 }
