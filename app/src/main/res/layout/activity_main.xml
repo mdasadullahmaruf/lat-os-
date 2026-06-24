@@ -126,15 +126,17 @@
             android:padding="12dp"
             android:textSize="14sp"
             android:inputType="text"
-            android:imeOptions="actionSend"/>
+            android:imeOptions="actionSend"
+            android:maxLines="1"/>
 
-        <ImageButton
+        <Button
             android:id="@+id/btnSendCommand"
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:src="@drawable/ic_microphone"
-            android:tint="@color/white"
-            android:background="@drawable/send_button_bg"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="SEND"
+            android:textSize="12sp"
+            android:textStyle="bold"
+            android:padding="12dp"
             android:layout_marginStart="8dp"/>
     </LinearLayout>
 
