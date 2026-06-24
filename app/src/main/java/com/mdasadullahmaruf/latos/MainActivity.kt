@@ -8,9 +8,9 @@ import android.os.Looper
 import android.provider.Settings
 import android.widget.Button
 import android.widget.EditText
-import android.widget.ImageButton
 import android.widget.ScrollView
 import android.widget.TextView
+import android.view.inputmethod.EditorInfo
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
@@ -25,7 +25,7 @@ class MainActivity : AppCompatActivity() {
     private lateinit var tvLog: TextView
     private lateinit var scrollLog: ScrollView
     private lateinit var etCommand: EditText
-    private lateinit var btnSendCommand: ImageButton
+    private lateinit var btnSendCommand: Button
     private lateinit var btnClearLog: Button
 
     private val handler = Handler(Looper.getMainLooper())
@@ -70,6 +70,20 @@ class MainActivity : AppCompatActivity() {
             if (command.isNotEmpty()) {
                 executeCommand(command)
                 etCommand.text.clear()
+            }
+        }
+
+        // Also trigger on keyboard "Done" or "Enter" key
+        etCommand.setOnEditorActionListener { _, actionId, _ ->
+            if (actionId == EditorInfo.IME_ACTION_SEND) {
+                val command = etCommand.text.toString().trim()
+                if (command.isNotEmpty()) {
+                    executeCommand(command)
+                    etCommand.text.clear()
+                }
+                true
+            } else {
+                false
             }
         }
 
@@ -129,7 +143,7 @@ class MainActivity : AppCompatActivity() {
         tvStatus.text = "Voice service starting...\nLook for floating bubble at top"
         addLog("Voice service started")
         updateUI()
-        
+
         handler.postDelayed({
             moveTaskToBack(true)
         }, 2000)
@@ -147,12 +161,12 @@ class MainActivity : AppCompatActivity() {
     // Manual command execution for testing
     private fun executeCommand(command: String) {
         addLog("You typed: \"$command\"")
-        
+
         val intent = intentEngine.parseCommand(command)
-        
+
         if (intent != null) {
             addLog("Parsed: action=${intent.action}, target=${intent.target}, query=${intent.query}")
-            
+
             when (intent.action) {
                 "open_app" -> {
                     if (intent.target.isNotEmpty()) {
@@ -160,34 +174,18 @@ class MainActivity : AppCompatActivity() {
                         if (success) {
                             addLog("SUCCESS: Opened app ${intent.target}")
                         } else {
-                            // Try direct package launch
-                            try {
-                                val launchIntent = packageManager.getLaunchIntentForPackage(intent.target)
-                                if (launchIntent != null) {
-                                    launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                                    startActivity(launchIntent)
-                                    addLog("SUCCESS: Launched ${intent.target}")
-                                } else {
-                                    addLog("FAILED: App not found - ${intent.target}")
-                                }
-                            } catch (e: Exception) {
-                                addLog("ERROR: ${e.message}")
-                            }
+                            addLog("FAILED: App not found - ${intent.target}")
                         }
                     } else {
                         addLog("FAILED: No app specified")
                     }
                 }
-                
+
                 "search" -> {
                     when {
                         intent.target.contains("youtube") -> {
                             deepLinkRouter.searchYouTube(intent.query)
                             addLog("SUCCESS: Searching YouTube for '${intent.query}'")
-                        }
-                        intent.target.contains("chrome") || intent.target.contains("google") -> {
-                            deepLinkRouter.searchGoogle(intent.query)
-                            addLog("SUCCESS: Searching Google for '${intent.query}'")
                         }
                         else -> {
                             deepLinkRouter.searchGoogle(intent.query)
@@ -195,27 +193,27 @@ class MainActivity : AppCompatActivity() {
                         }
                     }
                 }
-                
+
                 "call" -> {
                     deepLinkRouter.callNumber(intent.query)
                     addLog("SUCCESS: Dialing ${intent.query}")
                 }
-                
+
                 "tap" -> {
                     addLog("INFO: Tap command requires Accessibility Service")
                     addLog("Target: ${intent.query}")
                 }
-                
+
                 "type" -> {
                     addLog("INFO: Type command requires Accessibility Service")
                     addLog("Text: ${intent.query}")
                 }
-                
+
                 "scroll" -> {
                     addLog("INFO: Scroll command requires Accessibility Service")
                     addLog("Direction: ${intent.query}")
                 }
-                
+
                 else -> {
                     addLog("INFO: Command '${intent.action}' not yet implemented")
                 }
@@ -231,8 +229,7 @@ class MainActivity : AppCompatActivity() {
         val currentText = tvLog.text.toString()
         val newLine = "[$time] $message\n"
         tvLog.text = currentText + newLine
-        
-        // Auto scroll to bottom
+
         handler.post {
             scrollLog.fullScroll(ScrollView.FOCUS_DOWN)
         }
