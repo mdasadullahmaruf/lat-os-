@@ -9,106 +9,74 @@ object PackageMapper {
     private val knownApps = mapOf(
         // Google Apps
         "google" to "com.google.android.googlequicksearchbox",
-        "google search" to "com.google.android.googlequicksearchbox",
         "youtube" to "com.google.android.youtube",
-        "youtube music" to "com.google.android.apps.youtube.music",
         "gmail" to "com.google.android.gm",
-        "google maps" to "com.google.android.apps.maps",
         "maps" to "com.google.android.apps.maps",
-        "google drive" to "com.google.android.apps.docs",
         "drive" to "com.google.android.apps.docs",
-        "google photos" to "com.google.android.apps.photos",
         "photos" to "com.google.android.apps.photos",
-        "google meet" to "com.google.android.apps.meetings",
-        "meet" to "com.google.android.apps.meetings",
-        "google calendar" to "com.google.android.calendar",
-        "calendar" to "com.google.android.calendar",
-        "google translate" to "com.google.android.apps.translate",
-        "translate" to "com.google.android.apps.translate",
         "play store" to "com.android.vending",
-        "google play" to "com.android.vending",
-        "gemini" to "com.google.android.apps.bard",
-        "google gemini" to "com.google.android.apps.bard",
         "chrome" to "com.android.chrome",
         "google chrome" to "com.android.chrome",
-        "google assistant" to "com.google.android.googlequicksearchbox",
-
-        // Social & Messaging
         "whatsapp" to "com.whatsapp",
         "instagram" to "com.instagram.android",
         "facebook" to "com.facebook.katana",
-        "messenger" to "com.facebook.orca",
-        "facebook messenger" to "com.facebook.orca",
         "twitter" to "com.twitter.android",
-        "x" to "com.twitter.android",
-        "snapchat" to "com.snapchat.android",
         "tiktok" to "com.zhiliaoapp.musically",
-        "linkedin" to "com.linkedin.android",
         "telegram" to "org.telegram.messenger",
-        "discord" to "com.discord",
-        "signal" to "org.thoughtcrime.securesms",
-        "pinterest" to "com.pinterest",
-        "reddit" to "com.reddit.frontpage",
-        "threads" to "com.instagram.barcelona",
-
-        // Phone & SMS — common alternatives
         "phone" to "com.android.dialer",
-        "dialer" to "com.android.dialer",
         "contacts" to "com.android.contacts",
         "messages" to "com.android.messaging",
-        "message" to "com.android.messaging",
-        "sms" to "com.android.messaging",
-
-        // System Apps — common alternatives
         "gallery" to "com.android.gallery3d",
-        "albums" to "com.android.gallery3d",
         "browser" to "com.android.browser",
         "calculator" to "com.android.calculator2",
         "camera" to "com.android.camera",
         "clock" to "com.android.deskclock",
-        "alarm" to "com.android.deskclock",
         "file manager" to "com.android.filemanager",
-        "files" to "com.android.filemanager",
         "music" to "com.android.bbkmusic",
         "settings" to "com.android.settings",
-        "weather" to "com.vivo.weather",
-
-        // Streaming
         "netflix" to "com.netflix.mediaclient",
         "spotify" to "com.spotify.music",
-        "hotstar" to "in.startv.hotstar",
-        "disney" to "in.startv.hotstar",
-        "disney hotstar" to "in.startv.hotstar",
-        "prime video" to "com.amazon.avod.thirdpartyclient",
-        "amazon prime" to "com.amazon.avod.thirdpartyclient",
-        "amazon" to "com.amazon.mShop.android.shopping",
-        "mx player" to "com.mxtech.videoplayer.ad",
-        "vlc" to "org.videolan.vlc",
-
-        // Productivity
         "zoom" to "us.zoom.videomeetings",
         "teams" to "com.microsoft.teams",
-        "microsoft teams" to "com.microsoft.teams",
-        "outlook" to "com.microsoft.office.outlook",
-        "slack" to "com.Slack",
-        "notion" to "notion.id",
-        "claude" to "com.anthropic.claude",
         "chatgpt" to "com.openai.chatgpt",
-        "brave" to "com.brave.browser",
-        "opera" to "com.opera.browser",
-        "firefox" to "org.mozilla.firefox",
-        "edge" to "com.microsoft.emmx",
-
-        // Shopping
         "flipkart" to "com.flipkart.android",
-        "meesho" to "com.meesho.supply",
-        "myntra" to "com.myntra.android",
-
-        // Payments
         "gpay" to "com.google.android.apps.nbu.paisa.user",
-        "google pay" to "com.google.android.apps.nbu.paisa.user",
-        "phonepe" to "com.phonepe.app",
-        "paytm" to "net.one97.paytm"
+        "paytm" to "net.one97.paytm",
+
+        // Vivo / OriginOS specific
+        "vivo gallery" to "com.vivo.gallery",
+        "vivo browser" to "com.vivo.browser",
+        "vivo camera" to "com.android.camera",
+        "vivo settings" to "com.android.settings",
+        "vivo phone" to "com.android.dialer",
+        "vivo messages" to "com.android.messaging",
+        "vivo music" to "com.android.bbkmusic",
+        "vivo file manager" to "com.android.filemanager",
+        "vivo clock" to "com.android.deskclock",
+        "vivo weather" to "com.vivo.weather",
+        "vivo calculator" to "com.android.calculator2",
+        "vivo calendar" to "com.android.calendar",
+        "vivo video" to "com.android.bbkvideoplayer",
+        "vivo themes" to "com.bbk.theme",
+        "vivo app store" to "com.vivo.appstore",
+        "vivo store" to "com.vivo.website",
+        "vivo imanager" to "com.vivo.imanager",
+        "vivo tips" to "com.vivo.Tips",
+        "vivo easyshare" to "com.vivo.easyshare",
+        "vivo compass" to "com.vivo.compass",
+        "vivo notes" to "com.vivo.notes",
+        "vivo recorder" to "com.vivo.soundrecorder",
+        "vivo smart remote" to "com.vivo.vhome",
+
+        // Common alternative package names
+        "browser" to "com.android.browser",
+        "browser" to "com.vivo.browser",
+        "gallery" to "com.vivo.gallery",
+        "gallery" to "com.android.gallery3d",
+        "chrome" to "com.chrome.beta",
+        "chrome" to "com.google.android.apps.chrome",
+        "youtube" to "com.google.android.youtube.tv",
+        "youtube" to "com.google.android.apps.youtube.music"
     )
 
     fun findPackage(context: Context, query: String): String? {
@@ -120,11 +88,12 @@ object PackageMapper {
             if (isInstalled(context, pkg)) return pkg
         }
 
-        // 2. Partial match in known map
-        for ((name, pkg) in knownApps) {
-            if (q == name || q.contains(name) || name.contains(q)) {
-                if (isInstalled(context, pkg)) return pkg
-            }
+        // 2. Partial match in known map - check ALL matching entries
+        val matchingEntries = knownApps.filter { (name, _) ->
+            q == name || q.contains(name) || name.contains(q)
+        }
+        for ((_, pkg) in matchingEntries) {
+            if (isInstalled(context, pkg)) return pkg
         }
 
         // 3. Scan ALL installed apps on device
@@ -135,21 +104,25 @@ object PackageMapper {
             if (label == q) return pkg
         }
 
-        // Label contains query or query contains label
+        // Label contains query
         for ((label, pkg) in allApps) {
-            if (label.contains(q) || q.contains(label)) return pkg
+            if (label.contains(q)) return pkg
+        }
+
+        // Query contains label
+        for ((label, pkg) in allApps) {
+            if (q.contains(label)) return pkg
         }
 
         // Package name contains query
         for ((_, pkg) in allApps) {
             val pkgLower = pkg.lowercase()
             val queryNoSpace = q.replace(" ", "")
-            if (pkgLower.contains(queryNoSpace) ||
-                pkgLower.substringAfterLast(".").contains(queryNoSpace)
-            ) return pkg
+            if (pkgLower.contains(queryNoSpace)) return pkg
+            if (pkgLower.substringAfterLast(".").contains(queryNoSpace)) return pkg
         }
 
-        // 4. Fuzzy Levenshtein — catches typos
+        // 4. Fuzzy Levenshtein
         var bestPkg: String? = null
         var bestDist = Int.MAX_VALUE
         for ((label, pkg) in allApps) {
@@ -162,29 +135,16 @@ object PackageMapper {
         return bestPkg
     }
 
+    // Get list of all installed apps for debugging
+    fun getInstalledAppsList(context: Context): List<String> {
+        val allApps = getAllPackages(context)
+        return allApps.map { "${it.first} -> ${it.second}" }.sorted()
+    }
+
     private fun getAllPackages(context: Context): List<Pair<String, String>> {
         val pm = context.packageManager
         val results = mutableListOf<Pair<String, String>>()
 
-        // Method 1: All installed applications
-        try {
-            pm.getInstalledApplications(PackageManager.GET_META_DATA)
-                .forEach { appInfo ->
-                    try {
-                        val pkg = appInfo.packageName
-                        val launchIntent = pm.getLaunchIntentForPackage(pkg)
-                        if (launchIntent != null) {
-                            val label = pm.getApplicationLabel(appInfo)
-                                .toString().lowercase().trim()
-                            if (results.none { it.second == pkg }) {
-                                results.add(Pair(label, pkg))
-                            }
-                        }
-                    } catch (e: Exception) { }
-                }
-        } catch (e: Exception) { }
-
-        // Method 2: Launcher category
         try {
             val intent = Intent(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
