@@ -21,7 +21,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var btnGrantPermissions: Button
     private lateinit var btnStartListening: Button
     private lateinit var btnStopListening: Button
-    private lateinit var btnScanApps: Button
     private lateinit var tvStatus: TextView
     private lateinit var tvLog: TextView
     private lateinit var scrollLog: ScrollView
@@ -44,7 +43,6 @@ class MainActivity : AppCompatActivity() {
         btnGrantPermissions = findViewById(R.id.btnGrantPermissions)
         btnStartListening = findViewById(R.id.btnStartListening)
         btnStopListening = findViewById(R.id.btnStopListening)
-        btnScanApps = findViewById(R.id.btnScanApps)
         tvStatus = findViewById(R.id.tvStatus)
         tvLog = findViewById(R.id.tvLog)
         scrollLog = findViewById(R.id.scrollLog)
@@ -62,10 +60,6 @@ class MainActivity : AppCompatActivity() {
 
         btnStopListening.setOnClickListener {
             stopVoiceService()
-        }
-
-        btnScanApps.setOnClickListener {
-            scanInstalledApps()
         }
 
         btnSendCommand.setOnClickListener {
@@ -160,28 +154,6 @@ class MainActivity : AppCompatActivity() {
         updateUI()
     }
 
-    private fun scanInstalledApps() {
-        addLog("Scanning all installed apps...")
-        val apps = PackageMapper.getInstalledAppsList(this)
-        addLog("Found ${apps.size} apps")
-
-        // Show first 20 apps in log
-        apps.take(20).forEach {
-            addLog(it)
-        }
-        if (apps.size > 20) {
-            addLog("... and ${apps.size - 20} more apps")
-        }
-
-        // Specifically check for common apps
-        addLog("--- Checking common apps ---")
-        val checks = listOf("youtube", "chrome", "gallery", "browser", "camera", "settings")
-        for (app in checks) {
-            val pkg = PackageMapper.findPackage(this, app)
-            addLog("$app -> $pkg")
-        }
-    }
-
     private fun executeCommand(command: String) {
         addLog("You typed: \"$command\"")
 
@@ -202,7 +174,6 @@ class MainActivity : AppCompatActivity() {
                             addLog("SUCCESS: Opened ${intent.target}")
                         } else {
                             addLog("FAILED: App not found - ${intent.target}")
-                            addLog("Tip: Tap 'Scan My Apps' to see what's installed")
                         }
                     } else {
                         addLog("FAILED: No app name detected")
