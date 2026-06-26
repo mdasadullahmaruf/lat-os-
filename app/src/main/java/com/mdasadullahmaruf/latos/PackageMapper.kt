@@ -146,7 +146,7 @@ object PackageMapper {
 
             Log.d(TAG, "Finding package for query: '$q'")
 
-            // 1. Exact match in known map (highest priority)
+            // 1. Exact match in known map
             knownApps[q]?.let { pkg ->
                 Log.d(TAG, "Exact match in known map: '$q' -> $pkg")
                 if (isInstalled(context, pkg)) return pkg
@@ -256,7 +256,6 @@ object PackageMapper {
                 name == query -> 1000
                 name.startsWith(query) -> 500 + (100 / (name.length - query.length + 1))
                 name.contains(query) -> {
-                    // Penalize if query is just a substring of a longer word
                     val idx = name.indexOf(query)
                     val isWordBoundary = (idx == 0 || name[idx - 1] == ' ') &&
                             (idx + query.length == name.length || name[idx + query.length] == ' ')
@@ -286,12 +285,12 @@ object PackageMapper {
         val pm = context.packageManager
         val results = mutableListOf<Pair<String, String>>()
 
-        // Method 1: Query all launcher activities (standard, works on all Android versions)
+        // Method 1: Query all launcher activities
         try {
             val intent = Intent(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
             }
-            val apps: List<ResolveInfo> = pm.queryIntentActivities(intent, PackageManager.MATCH_ALL)
+            val apps: List<ResolveInfo> = pm.queryIntentActivities(intent, 0)
             for (info in apps) {
                 try {
                     val label = normalizeLabel(info.loadLabel(pm).toString())
@@ -299,17 +298,19 @@ object PackageMapper {
                     if (results.none { it.second == pkg }) {
                         results.add(Pair(label, pkg))
                     }
-                } catch (e: Exception) { }
+                } catch (e: Exception) {
+                    // ignore
+                }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error querying launcher apps", e)
         }
 
-        // Method 2: Query any MAIN activity (catches apps without CATEGORY_LAUNCHER)
+        // Method 2: Query any MAIN activity (catches edge-case OEM apps)
         if (results.size < 50) {
             try {
                 val intent = Intent(Intent.ACTION_MAIN)
-                val apps: List<ResolveInfo> = pm.queryIntentActivities(intent, PackageManager.MATCH_ALL)
+                val apps: List<ResolveInfo> = pm.queryIntentActivities(intent, 0)
                 for (info in apps) {
                     try {
                         val label = normalizeLabel(info.loadLabel(pm).toString())
@@ -317,17 +318,19 @@ object PackageMapper {
                         if (results.none { it.second == pkg }) {
                             results.add(Pair(label, pkg))
                         }
-                    } catch (e: Exception) { }
+                    } catch (e: Exception) {
+                        // ignore
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error querying MAIN apps", e)
             }
         }
 
-        // Method 3: Deep scan using getInstalledPackages (may be restricted on Android 11+)
+        // Method 3: Deep scan using getInstalledPackages
         if (results.size < 50) {
             try {
-                val packages = pm.getInstalledPackages(PackageManager.GET_ACTIVITIES)
+                val packages = pm.getInstalledPackages(0)
                 for (packageInfo in packages) {
                     try {
                         val pkg = packageInfo.packageName
@@ -335,10 +338,15 @@ object PackageMapper {
 
                         val launchIntent = pm.getLaunchIntentForPackage(pkg)
                         if (launchIntent != null) {
-                            val label = normalizeLabel(pm.getApplicationLabel(packageInfo.applicationInfo).toString())
-                            results.add(Pair(label, pkg))
+                            val appInfo = packageInfo.applicationInfo
+                            if (appInfo != null) {
+                                val label = normalizeLabel(pm.getApplicationLabel(appInfo).toString())
+                                results.add(Pair(label, pkg))
+                            }
                         }
-                    } catch (e: Exception) { }
+                    } catch (e: Exception) {
+                        // ignore
+                    }
                 }
             } catch (e: Exception) {
                 Log.e(TAG, "Error deep scanning packages", e)
