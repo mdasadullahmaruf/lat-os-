@@ -15,8 +15,11 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import android.content.pm.PackageManager
 import android.Manifest
+import android.util.Log
 
 class MainActivity : AppCompatActivity() {
+
+    private val TAG = "LatOS"
 
     private lateinit var btnGrantPermissions: Button
     private lateinit var btnStartListening: Button
@@ -104,6 +107,16 @@ class MainActivity : AppCompatActivity() {
             tvLog.text = ""
         }
 
+        // Pre-scan apps on startup (background thread, safe)
+        Thread {
+            try {
+                PackageMapper.refreshCache(this)
+                Log.d(TAG, "App cache pre-loaded")
+            } catch (e: Exception) {
+                Log.e(TAG, "Pre-scan failed: ${e.message}")
+            }
+        }.start()
+
         updateUI()
     }
 
@@ -174,19 +187,26 @@ class MainActivity : AppCompatActivity() {
     private fun scanInstalledApps() {
         addLog("=== SCANNING ALL INSTALLED APPS ===")
         addLog("This may take a moment...")
-        
+
         Thread {
-            val apps = PackageMapper.refreshCache(this)
-            val appStrings = apps.map { "${it.first} -> ${it.second}" }.sorted()
-            
-            handler.post {
-                addLog("=== ALL APPS (${apps.size}) ===")
-                appStrings.take(30).forEach { addLog(it) }
-                if (apps.size > 30) {
-                    addLog("... and ${apps.size - 30} more apps")
+            try {
+                val apps = PackageMapper.refreshCache(this)
+                val appStrings = apps.map { "${it.first} -> ${it.second}" }.sorted()
+
+                handler.post {
+                    addLog("=== ALL APPS (${apps.size}) ===")
+                    appStrings.take(30).forEach { addLog(it) }
+                    if (apps.size > 30) {
+                        addLog("... and ${apps.size - 30} more apps")
+                    }
+                    addLog("=== END OF LIST ===")
+                    addLog("Tip: Use 'Test App Finder' to check if a specific app can be found")
                 }
-                addLog("=== END OF LIST ===")
-                addLog("Tip: Use 'Test App Finder' to check if a specific app can be found")
+            } catch (e: Exception) {
+                handler.post {
+                    addLog("ERROR scanning apps: ${e.message}")
+                    Log.e(TAG, "Scan error", e)
+                }
             }
         }.start()
     }
@@ -194,114 +214,125 @@ class MainActivity : AppCompatActivity() {
     private fun testAppFinder(appName: String) {
         addLog("=== TEST APP FINDER ===")
         addLog("Looking for: '$appName'")
-        
+
         Thread {
-            val pkg = PackageMapper.findPackage(this, appName)
-            handler.post {
-                if (pkg != null) {
-                    addLog("FOUND: $pkg")
-                    addLog("Testing launch...")
-                    val success = PackageMapper.isInstalled(this, pkg)
-                    addLog("Installed: $success")
-                    if (success) {
-                        addLog("Launching now...")
-                        deepLinkRouter.openPackage(pkg)
+            try {
+                val pkg = PackageMapper.findPackage(this, appName)
+                handler.post {
+                    if (pkg != null) {
+                        addLog("FOUND: $pkg")
+                        addLog("Testing launch...")
+                        val success = PackageMapper.isInstalled(this, pkg)
+                        addLog("Installed: $success")
+                        if (success) {
+                            addLog("Launching now...")
+                            deepLinkRouter.openPackage(pkg)
+                        }
+                    } else {
+                        addLog("NOT FOUND: No app matching '$appName'")
+                        addLog("Try scanning all apps first to see exact names")
                     }
-                } else {
-                    addLog("NOT FOUND: No app matching '$appName'")
-                    addLog("Try scanning all apps first to see exact names")
+                    addLog("=== END TEST ===")
                 }
-                addLog("=== END TEST ===")
+            } catch (e: Exception) {
+                handler.post {
+                    addLog("ERROR in test finder: ${e.message}")
+                    Log.e(TAG, "Test finder error", e)
+                }
             }
         }.start()
     }
 
+    // FIXED: executeCommand now runs on main thread with try-catch
+    // App launching is fast enough, no need for background thread
     private fun executeCommand(command: String) {
         addLog("=== COMMAND ===")
         addLog("You typed: \"$command\"")
 
-        val intent = intentEngine.parseCommand(command)
+        try {
+            val intent = intentEngine.parseCommand(command)
 
-        if (intent != null) {
-            addLog("Parsed: action=${intent.action}, target=${intent.target}, query=${intent.query}")
+            if (intent != null) {
+                addLog("Parsed: action=${intent.action}, target=${intent.target}, query=${intent.query}")
 
-            when (intent.action) {
-                "open_app" -> {
-                    if (intent.target.isNotEmpty()) {
-                        addLog("Searching for app: ${intent.target}")
-                        
-                        Thread {
+                when (intent.action) {
+                    "open_app" -> {
+                        if (intent.target.isNotEmpty()) {
+                            addLog("Searching for app: ${intent.target}")
+
                             val (success, pkgName) = deepLinkRouter.openApp(intent.target)
-                            handler.post {
-                                if (success) {
-                                    addLog("SUCCESS: Opened ${intent.target} ($pkgName)")
-                                } else {
-                                    addLog("FAILED: Could not open ${intent.target}")
-                                    addLog("Package found: $pkgName")
-                                    addLog("Tip: Try 'Test App Finder' with the exact app name")
-                                }
-                                addLog("=== END ===")
+                            if (success) {
+                                addLog("SUCCESS: Opened ${intent.target} ($pkgName)")
+                            } else {
+                                addLog("FAILED: Could not open ${intent.target}")
+                                addLog("Package found: $pkgName")
+                                addLog("Tip: Try 'Test App Finder' with the exact app name")
                             }
-                        }.start()
-                    } else {
-                        addLog("FAILED: No app name detected in command")
-                        addLog("Try: 'Open YouTube' or 'Open Chrome'")
+                            addLog("=== END ===")
+                        } else {
+                            addLog("FAILED: No app name detected in command")
+                            addLog("Try: 'Open YouTube' or 'Open Chrome'")
+                            addLog("=== END ===")
+                        }
+                    }
+
+                    "search" -> {
+                        addLog("Searching for: ${intent.query}")
+                        when {
+                            intent.target.contains("youtube") -> {
+                                val success = deepLinkRouter.searchYouTube(intent.query)
+                                if (success) {
+                                    addLog("SUCCESS: Searching YouTube for '${intent.query}'")
+                                } else {
+                                    addLog("FAILED: Could not search YouTube")
+                                }
+                            }
+                            else -> {
+                                deepLinkRouter.searchGoogle(intent.query)
+                                addLog("SUCCESS: Searching Google for '${intent.query}'")
+                            }
+                        }
+                        addLog("=== END ===")
+                    }
+
+                    "call" -> {
+                        deepLinkRouter.callNumber(intent.query)
+                        addLog("SUCCESS: Dialing ${intent.query}")
+                        addLog("=== END ===")
+                    }
+
+                    "tap" -> {
+                        addLog("INFO: Tap command requires Accessibility Service")
+                        addLog("Target: ${intent.query}")
+                        addLog("=== END ===")
+                    }
+
+                    "type" -> {
+                        addLog("INFO: Type command requires Accessibility Service")
+                        addLog("Text: ${intent.query}")
+                        addLog("=== END ===")
+                    }
+
+                    "scroll" -> {
+                        addLog("INFO: Scroll command requires Accessibility Service")
+                        addLog("Direction: ${intent.query}")
+                        addLog("=== END ===")
+                    }
+
+                    else -> {
+                        addLog("INFO: Command '${intent.action}' not yet implemented")
                         addLog("=== END ===")
                     }
                 }
-
-                "search" -> {
-                    addLog("Searching for: ${intent.query}")
-                    when {
-                        intent.target.contains("youtube") -> {
-                            val success = deepLinkRouter.searchYouTube(intent.query)
-                            if (success) {
-                                addLog("SUCCESS: Searching YouTube for '${intent.query}'")
-                            } else {
-                                addLog("FAILED: Could not search YouTube")
-                            }
-                        }
-                        else -> {
-                            deepLinkRouter.searchGoogle(intent.query)
-                            addLog("SUCCESS: Searching Google for '${intent.query}'")
-                        }
-                    }
-                    addLog("=== END ===")
-                }
-
-                "call" -> {
-                    deepLinkRouter.callNumber(intent.query)
-                    addLog("SUCCESS: Dialing ${intent.query}")
-                    addLog("=== END ===")
-                }
-
-                "tap" -> {
-                    addLog("INFO: Tap command requires Accessibility Service")
-                    addLog("Target: ${intent.query}")
-                    addLog("=== END ===")
-                }
-
-                "type" -> {
-                    addLog("INFO: Type command requires Accessibility Service")
-                    addLog("Text: ${intent.query}")
-                    addLog("=== END ===")
-                }
-
-                "scroll" -> {
-                    addLog("INFO: Scroll command requires Accessibility Service")
-                    addLog("Direction: ${intent.query}")
-                    addLog("=== END ===")
-                }
-
-                else -> {
-                    addLog("INFO: Command '${intent.action}' not yet implemented")
-                    addLog("=== END ===")
-                }
+            } else {
+                addLog("FAILED: Could not understand command")
+                addLog("Try: 'Open YouTube' or 'Search cats'")
+                addLog("=== END ===")
             }
-        } else {
-            addLog("FAILED: Could not understand command")
-            addLog("Try: 'Open YouTube' or 'Search cats'")
-            addLog("=== END ===")
+        } catch (e: Exception) {
+            addLog("CRASH: ${e.message}")
+            addLog("Stack: ${e.stackTrace.take(5).joinToString("\n")}")
+            Log.e(TAG, "Command execution crash", e)
         }
     }
 
