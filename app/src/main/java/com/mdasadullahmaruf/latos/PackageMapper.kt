@@ -15,7 +15,6 @@ object PackageMapper {
     private var cacheTimestamp: Long = 0
     private val CACHE_TTL = 5 * 60 * 1000
 
-    // All known app aliases → package names
     private val knownApps = mapOf(
         "google" to "com.google.android.googlequicksearchbox",
         "google search" to "com.google.android.googlequicksearchbox",
@@ -83,7 +82,6 @@ object PackageMapper {
         "easyshare" to "com.vivo.easyshare",
         "tips" to "com.vivo.Tips",
         "vivo store" to "com.vivo.website",
-        "v-appstore" to "com.vivo.appstore",
         "v-appstore" to "com.vivo.appstore",
         "simple view" to "com.vivo.simplelauncher",
         "smart remote" to "com.vivo.vhome",
@@ -156,10 +154,10 @@ object PackageMapper {
 
             Log.d(TAG, "Finding package for query: '$q'")
 
-            // STEP 1: Direct exact match in known map
+            // STEP 1: Direct exact match in known map — return immediately
             knownApps[q]?.let { pkg ->
                 Log.d(TAG, "Exact alias match: '$q' -> $pkg")
-                if (isInstalled(context, pkg)) return pkg
+                return pkg
             }
 
             // STEP 2: Check each word against known aliases
@@ -168,7 +166,7 @@ object PackageMapper {
                 if (word.length < 2) continue
                 knownApps[word]?.let { pkg ->
                     Log.d(TAG, "Word match: '$word' -> $pkg")
-                    if (isInstalled(context, pkg)) return pkg
+                    return pkg
                 }
             }
 
@@ -176,7 +174,7 @@ object PackageMapper {
             val knownMatch = findBestKnownMatch(q)
             if (knownMatch != null) {
                 Log.d(TAG, "Scored known match: '$q' -> $knownMatch")
-                if (isInstalled(context, knownMatch)) return knownMatch
+                return knownMatch
             }
 
             // STEP 4: Scan device apps
@@ -367,26 +365,19 @@ object PackageMapper {
             }
         }
 
-        // Method 4: Check all known app packages directly
-        // This catches Google apps hidden from getInstalledApplications()
+        // Method 4: Add ALL known apps to the scan list
+        // This ensures YouTube, Chrome, etc. appear even if OriginOS hides them
         for ((alias, pkg) in knownApps) {
             if (results.any { it.second == pkg }) continue
             try {
-                val launchIntent = pm.getLaunchIntentForPackage(pkg)
-                if (launchIntent != null) {
-                    // Try to get the real label
-                    val label = try {
-                        val appInfo = pm.getApplicationInfo(pkg, 0)
-                        pm.getApplicationLabel(appInfo).toString()
-                            .lowercase(Locale.getDefault())
-                            .trim()
-                    } catch (e: Exception) {
-                        alias // fallback to alias name
-                    }
-                    results.add(Pair(label, pkg))
-                }
+                val appInfo = pm.getApplicationInfo(pkg, 0)
+                val label = pm.getApplicationLabel(appInfo).toString()
+                    .lowercase(Locale.getDefault())
+                    .trim()
+                results.add(Pair(label, pkg))
             } catch (e: Exception) {
-                // not installed or not accessible
+                // Package not installed — add with alias name as fallback
+                results.add(Pair(alias, pkg))
             }
         }
 
