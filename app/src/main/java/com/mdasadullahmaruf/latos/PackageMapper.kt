@@ -36,6 +36,7 @@ object PackageMapper {
         "translate" to "com.google.android.apps.translate",
         "play store" to "com.android.vending",
         "google play" to "com.android.vending",
+        "google play store" to "com.android.vending",
         "app store" to "com.android.vending",
         "gemini" to "com.google.android.apps.bard",
         "google gemini" to "com.google.android.apps.bard",
@@ -58,9 +59,9 @@ object PackageMapper {
         "pinterest" to "com.pinterest",
         "reddit" to "com.reddit.frontpage",
         "threads" to "com.instagram.barcelona",
-        "phone" to "com.android.dialer",
-        "dialer" to "com.android.dialer",
-        "contacts" to "com.android.contacts",
+        "phone" to "com.google.android.dialer",
+        "dialer" to "com.google.android.dialer",
+        "contacts" to "com.google.android.contacts",
         "messages" to "com.google.android.apps.messaging",
         "message" to "com.google.android.apps.messaging",
         "sms" to "com.google.android.apps.messaging",
@@ -82,6 +83,7 @@ object PackageMapper {
         "easyshare" to "com.vivo.easyshare",
         "tips" to "com.vivo.Tips",
         "vivo store" to "com.vivo.website",
+        "v-appstore" to "com.vivo.appstore",
         "v-appstore" to "com.vivo.appstore",
         "simple view" to "com.vivo.simplelauncher",
         "smart remote" to "com.vivo.vhome",
@@ -129,17 +131,16 @@ object PackageMapper {
         "live transcribe" to "com.google.audio.hearing.visualization.accessibility.scribe",
         "mi fitness" to "com.xiaomi.wearable",
         "xiami earbuds" to "com.mi.earphone",
-        "the majestic reading" to "com.themajesticreading"
+        "the majestic reading" to "com.themajesticreading",
+        "kimi" to "com.moonshot.kimichat",
+        "imo" to "com.imo.android.imoim",
+        "keep notes" to "com.google.android.keep",
+        "google home" to "com.google.android.apps.chromecast.app",
+        "google wallet" to "com.google.android.apps.walletnfcrel",
+        "tasks" to "com.google.android.apps.tasks",
+        "free fire" to "com.dts.freefireth",
+        "system tracing" to "com.android.traceur"
     )
-
-    // Reverse map: package → list of aliases (for quick lookup)
-    private val packageAliases: Map<String, List<String>> by lazy {
-        val map = mutableMapOf<String, MutableList<String>>()
-        for ((alias, pkg) in knownApps) {
-            map.getOrPut(pkg) { mutableListOf() }.add(alias)
-        }
-        map
-    }
 
     fun findPackage(context: Context, query: String): String? {
         return try {
@@ -155,14 +156,13 @@ object PackageMapper {
 
             Log.d(TAG, "Finding package for query: '$q'")
 
-            // STEP 1: Direct known app exact match (highest priority)
+            // STEP 1: Direct exact match in known map
             knownApps[q]?.let { pkg ->
                 Log.d(TAG, "Exact alias match: '$q' -> $pkg")
                 if (isInstalled(context, pkg)) return pkg
             }
 
-            // STEP 2: Check each word in query against known aliases
-            // "open chrome browser" → check "chrome", then "browser"
+            // STEP 2: Check each word against known aliases
             val words = q.split(" ")
             for (word in words) {
                 if (word.length < 2) continue
@@ -172,15 +172,14 @@ object PackageMapper {
                 }
             }
 
-            // STEP 3: Scored partial match in known map
-            // This prevents "google" from matching "google play"
+            // STEP 3: Scored match in known map
             val knownMatch = findBestKnownMatch(q)
             if (knownMatch != null) {
                 Log.d(TAG, "Scored known match: '$q' -> $knownMatch")
                 if (isInstalled(context, knownMatch)) return knownMatch
             }
 
-            // STEP 4: Scan device apps (with cache)
+            // STEP 4: Scan device apps
             val allApps = getAllPackages(context)
             Log.d(TAG, "Scanned ${allApps.size} apps, searching for '$q'")
 
@@ -192,7 +191,7 @@ object PackageMapper {
                 }
             }
 
-            // Word-by-word match in scanned labels
+            // Word match in scanned labels
             for ((label, pkg) in allApps) {
                 val labelWords = label.split(" ")
                 for (word in words) {
@@ -258,10 +257,6 @@ object PackageMapper {
         }
     }
 
-    /**
-     * Finds the best known app match using scoring.
-     * Exact = 1000, startsWith = 500+, word boundary = 300, substring = 50
-     */
     private fun findBestKnownMatch(query: String): String? {
         var bestPkg: String? = null
         var bestScore = -1
@@ -300,7 +295,7 @@ object PackageMapper {
         val pm = context.packageManager
         val results = mutableListOf<Pair<String, String>>()
 
-        // Method 1: All installed applications (finds system + some user apps)
+        // Method 1: All installed applications
         try {
             val apps = pm.getInstalledApplications(0)
             for (appInfo in apps) {
@@ -324,7 +319,7 @@ object PackageMapper {
             Log.e(TAG, "Error querying installed applications", e)
         }
 
-        // Method 2: Launcher category (catches apps Method 1 missed)
+        // Method 2: Launcher category
         if (results.size < 50) {
             try {
                 val intent = Intent(Intent.ACTION_MAIN).apply {
@@ -349,7 +344,7 @@ object PackageMapper {
             }
         }
 
-        // Method 3: All main activities (final fallback)
+        // Method 3: All main activities
         if (results.size < 50) {
             try {
                 val intent = Intent(Intent.ACTION_MAIN)
@@ -372,6 +367,29 @@ object PackageMapper {
             }
         }
 
+        // Method 4: Check all known app packages directly
+        // This catches Google apps hidden from getInstalledApplications()
+        for ((alias, pkg) in knownApps) {
+            if (results.any { it.second == pkg }) continue
+            try {
+                val launchIntent = pm.getLaunchIntentForPackage(pkg)
+                if (launchIntent != null) {
+                    // Try to get the real label
+                    val label = try {
+                        val appInfo = pm.getApplicationInfo(pkg, 0)
+                        pm.getApplicationLabel(appInfo).toString()
+                            .lowercase(Locale.getDefault())
+                            .trim()
+                    } catch (e: Exception) {
+                        alias // fallback to alias name
+                    }
+                    results.add(Pair(label, pkg))
+                }
+            } catch (e: Exception) {
+                // not installed or not accessible
+            }
+        }
+
         cachedApps = results.distinctBy { it.second }
         cacheTimestamp = now
         Log.d(TAG, "Cached ${cachedApps!!.size} apps")
@@ -383,10 +401,6 @@ object PackageMapper {
         return getAllPackages(context)
     }
 
-    /**
-     * Checks if a package is installed by trying to get its launch intent.
-     * This works even for apps hidden from getInstalledApplications().
-     */
     fun isInstalled(context: Context, packageName: String): Boolean {
         return try {
             context.packageManager.getLaunchIntentForPackage(packageName) != null
