@@ -15,8 +15,8 @@ object PackageMapper {
     private var cacheTimestamp: Long = 0
     private val CACHE_TTL = 5 * 60 * 1000
 
+    // All known app aliases → package names
     private val knownApps = mapOf(
-        // Google Apps
         "google" to "com.google.android.googlequicksearchbox",
         "google search" to "com.google.android.googlequicksearchbox",
         "youtube" to "com.google.android.youtube",
@@ -42,8 +42,6 @@ object PackageMapper {
         "chrome" to "com.android.chrome",
         "google chrome" to "com.android.chrome",
         "google assistant" to "com.google.android.googlequicksearchbox",
-
-        // Social & Messaging
         "whatsapp" to "com.whatsapp",
         "instagram" to "com.instagram.android",
         "facebook" to "com.facebook.katana",
@@ -60,16 +58,12 @@ object PackageMapper {
         "pinterest" to "com.pinterest",
         "reddit" to "com.reddit.frontpage",
         "threads" to "com.instagram.barcelona",
-
-        // Phone & SMS
         "phone" to "com.android.dialer",
         "dialer" to "com.android.dialer",
         "contacts" to "com.android.contacts",
         "messages" to "com.google.android.apps.messaging",
         "message" to "com.google.android.apps.messaging",
         "sms" to "com.google.android.apps.messaging",
-
-        // System Apps
         "gallery" to "com.vivo.gallery",
         "albums" to "com.vivo.gallery",
         "browser" to "com.vivo.browser",
@@ -92,8 +86,6 @@ object PackageMapper {
         "simple view" to "com.vivo.simplelauncher",
         "smart remote" to "com.vivo.vhome",
         "digital wellbeing" to "com.google.android.apps.wellbeing",
-
-        // Streaming
         "netflix" to "com.netflix.mediaclient",
         "spotify" to "com.spotify.music",
         "hotstar" to "in.startv.hotstar",
@@ -104,8 +96,6 @@ object PackageMapper {
         "amazon" to "com.amazon.mShop.android.shopping",
         "mx player" to "com.mxtech.videoplayer.ad",
         "vlc" to "org.videolan.vlc",
-
-        // Productivity
         "zoom" to "us.zoom.videomeetings",
         "teams" to "com.microsoft.teams",
         "microsoft teams" to "com.microsoft.teams",
@@ -118,19 +108,13 @@ object PackageMapper {
         "opera" to "com.opera.browser",
         "firefox" to "org.mozilla.firefox",
         "edge" to "com.microsoft.emmx",
-
-        // Shopping
         "flipkart" to "com.flipkart.android",
         "meesho" to "com.meesho.supply",
         "myntra" to "com.myntra.android",
-
-        // Payments
         "gpay" to "com.google.android.apps.nbu.paisa.user",
         "google pay" to "com.google.android.apps.nbu.paisa.user",
         "phonepe" to "com.phonepe.app",
         "paytm" to "net.one97.paytm",
-
-        // Other
         "botim" to "im.thebot.messenger",
         "deepseek" to "com.deepseek.chat",
         "duolingo" to "com.duolingo",
@@ -148,6 +132,15 @@ object PackageMapper {
         "the majestic reading" to "com.themajesticreading"
     )
 
+    // Reverse map: package → list of aliases (for quick lookup)
+    private val packageAliases: Map<String, List<String>> by lazy {
+        val map = mutableMapOf<String, MutableList<String>>()
+        for ((alias, pkg) in knownApps) {
+            map.getOrPut(pkg) { mutableListOf() }.add(alias)
+        }
+        map
+    }
+
     fun findPackage(context: Context, query: String): String? {
         return try {
             val q = query.lowercase(Locale.getDefault()).trim()
@@ -162,20 +155,32 @@ object PackageMapper {
 
             Log.d(TAG, "Finding package for query: '$q'")
 
-            // 1. Exact match in known map
+            // STEP 1: Direct known app exact match (highest priority)
             knownApps[q]?.let { pkg ->
-                Log.d(TAG, "Exact match in known map: '$q' -> $pkg")
+                Log.d(TAG, "Exact alias match: '$q' -> $pkg")
                 if (isInstalled(context, pkg)) return pkg
             }
 
-            // 2. Scored match in known map (prevents "google" matching "google play")
+            // STEP 2: Check each word in query against known aliases
+            // "open chrome browser" → check "chrome", then "browser"
+            val words = q.split(" ")
+            for (word in words) {
+                if (word.length < 2) continue
+                knownApps[word]?.let { pkg ->
+                    Log.d(TAG, "Word match: '$word' -> $pkg")
+                    if (isInstalled(context, pkg)) return pkg
+                }
+            }
+
+            // STEP 3: Scored partial match in known map
+            // This prevents "google" from matching "google play"
             val knownMatch = findBestKnownMatch(q)
             if (knownMatch != null) {
                 Log.d(TAG, "Scored known match: '$q' -> $knownMatch")
                 if (isInstalled(context, knownMatch)) return knownMatch
             }
 
-            // 3. Scan ALL installed apps on device (with cache)
+            // STEP 4: Scan device apps (with cache)
             val allApps = getAllPackages(context)
             Log.d(TAG, "Scanned ${allApps.size} apps, searching for '$q'")
 
@@ -184,6 +189,17 @@ object PackageMapper {
                 if (label == q) {
                     Log.d(TAG, "Exact label match: '$label' -> $pkg")
                     return pkg
+                }
+            }
+
+            // Word-by-word match in scanned labels
+            for ((label, pkg) in allApps) {
+                val labelWords = label.split(" ")
+                for (word in words) {
+                    if (word.length > 2 && labelWords.contains(word)) {
+                        Log.d(TAG, "Word in label: '$word' in '$label' -> $pkg")
+                        return pkg
+                    }
                 }
             }
 
@@ -218,7 +234,7 @@ object PackageMapper {
                 }
             }
 
-            // 4. Fuzzy Levenshtein
+            // STEP 5: Fuzzy Levenshtein
             var bestPkg: String? = null
             var bestDist = Int.MAX_VALUE
             for ((label, pkg) in allApps) {
@@ -243,8 +259,8 @@ object PackageMapper {
     }
 
     /**
-     * Finds the best known app match using scoring to prevent substring false positives.
-     * "google" should match "google" (score 1000) not "google play" (score 50).
+     * Finds the best known app match using scoring.
+     * Exact = 1000, startsWith = 500+, word boundary = 300, substring = 50
      */
     private fun findBestKnownMatch(query: String): String? {
         var bestPkg: String? = null
@@ -284,7 +300,7 @@ object PackageMapper {
         val pm = context.packageManager
         val results = mutableListOf<Pair<String, String>>()
 
-        // Method 1: All installed applications (PRIMARY — this is what finds 90 apps)
+        // Method 1: All installed applications (finds system + some user apps)
         try {
             val apps = pm.getInstalledApplications(0)
             for (appInfo in apps) {
@@ -301,14 +317,14 @@ object PackageMapper {
                         }
                     }
                 } catch (e: Exception) {
-                    // ignore unreadable apps
+                    // ignore
                 }
             }
         } catch (e: Exception) {
             Log.e(TAG, "Error querying installed applications", e)
         }
 
-        // Method 2: Launcher category (fallback)
+        // Method 2: Launcher category (catches apps Method 1 missed)
         if (results.size < 50) {
             try {
                 val intent = Intent(Intent.ACTION_MAIN).apply {
@@ -333,7 +349,7 @@ object PackageMapper {
             }
         }
 
-        // Method 3: All main activities (fallback)
+        // Method 3: All main activities (final fallback)
         if (results.size < 50) {
             try {
                 val intent = Intent(Intent.ACTION_MAIN)
@@ -367,6 +383,10 @@ object PackageMapper {
         return getAllPackages(context)
     }
 
+    /**
+     * Checks if a package is installed by trying to get its launch intent.
+     * This works even for apps hidden from getInstalledApplications().
+     */
     fun isInstalled(context: Context, packageName: String): Boolean {
         return try {
             context.packageManager.getLaunchIntentForPackage(packageName) != null
