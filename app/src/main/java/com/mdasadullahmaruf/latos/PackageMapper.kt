@@ -16,6 +16,7 @@ object PackageMapper {
     private val CACHE_TTL = 5 * 60 * 1000
 
     private val knownApps = mapOf(
+        // Google Apps
         "google" to "com.google.android.googlequicksearchbox",
         "google search" to "com.google.android.googlequicksearchbox",
         "youtube" to "com.google.android.youtube",
@@ -41,6 +42,8 @@ object PackageMapper {
         "chrome" to "com.android.chrome",
         "google chrome" to "com.android.chrome",
         "google assistant" to "com.google.android.googlequicksearchbox",
+
+        // Social & Messaging
         "whatsapp" to "com.whatsapp",
         "instagram" to "com.instagram.android",
         "facebook" to "com.facebook.katana",
@@ -57,12 +60,16 @@ object PackageMapper {
         "pinterest" to "com.pinterest",
         "reddit" to "com.reddit.frontpage",
         "threads" to "com.instagram.barcelona",
+
+        // Phone & SMS
         "phone" to "com.android.dialer",
         "dialer" to "com.android.dialer",
         "contacts" to "com.android.contacts",
-        "messages" to "com.android.messaging",
-        "message" to "com.android.messaging",
-        "sms" to "com.android.messaging",
+        "messages" to "com.google.android.apps.messaging",
+        "message" to "com.google.android.apps.messaging",
+        "sms" to "com.google.android.apps.messaging",
+
+        // System Apps
         "gallery" to "com.vivo.gallery",
         "albums" to "com.vivo.gallery",
         "browser" to "com.vivo.browser",
@@ -84,6 +91,9 @@ object PackageMapper {
         "v-appstore" to "com.vivo.appstore",
         "simple view" to "com.vivo.simplelauncher",
         "smart remote" to "com.vivo.vhome",
+        "digital wellbeing" to "com.google.android.apps.wellbeing",
+
+        // Streaming
         "netflix" to "com.netflix.mediaclient",
         "spotify" to "com.spotify.music",
         "hotstar" to "in.startv.hotstar",
@@ -94,6 +104,8 @@ object PackageMapper {
         "amazon" to "com.amazon.mShop.android.shopping",
         "mx player" to "com.mxtech.videoplayer.ad",
         "vlc" to "org.videolan.vlc",
+
+        // Productivity
         "zoom" to "us.zoom.videomeetings",
         "teams" to "com.microsoft.teams",
         "microsoft teams" to "com.microsoft.teams",
@@ -106,15 +118,19 @@ object PackageMapper {
         "opera" to "com.opera.browser",
         "firefox" to "org.mozilla.firefox",
         "edge" to "com.microsoft.emmx",
-        "docs" to "com.google.android.apps.docs.editors.docs",
-        "tasks" to "com.google.android.apps.tasks",
+
+        // Shopping
         "flipkart" to "com.flipkart.android",
         "meesho" to "com.meesho.supply",
         "myntra" to "com.myntra.android",
+
+        // Payments
         "gpay" to "com.google.android.apps.nbu.paisa.user",
         "google pay" to "com.google.android.apps.nbu.paisa.user",
         "phonepe" to "com.phonepe.app",
         "paytm" to "net.one97.paytm",
+
+        // Other
         "botim" to "im.thebot.messenger",
         "deepseek" to "com.deepseek.chat",
         "duolingo" to "com.duolingo",
@@ -135,7 +151,7 @@ object PackageMapper {
     fun findPackage(context: Context, query: String): String? {
         return try {
             val q = query.lowercase(Locale.getDefault()).trim()
-                .replace(Regex("[^a-z0-9 ]"), " ")
+                .replace(Regex("[^a-z0-9 ]"), "")
                 .replace(Regex("\\s+"), " ")
                 .trim()
 
@@ -171,23 +187,6 @@ object PackageMapper {
                 }
             }
 
-            // Label starts with query (prefix match)
-            for ((label, pkg) in allApps) {
-                if (label.startsWith(q)) {
-                    Log.d(TAG, "Prefix match: '$label' -> $pkg")
-                    return pkg
-                }
-            }
-
-            // Whole word match
-            val wordRegex = Regex("""(^|\s)${Regex.escape(q)}($|\s)""")
-            for ((label, pkg) in allApps) {
-                if (wordRegex.containsMatchIn(label)) {
-                    Log.d(TAG, "Whole word match: '$label' -> $pkg")
-                    return pkg
-                }
-            }
-
             // Label contains query
             for ((label, pkg) in allApps) {
                 if (label.contains(q)) {
@@ -196,7 +195,7 @@ object PackageMapper {
                 }
             }
 
-            // Query contains label (for multi-word queries)
+            // Query contains label
             for ((label, pkg) in allApps) {
                 if (q.contains(label) && label.length > 2) {
                     Log.d(TAG, "Query contains label: '$label' -> $pkg")
@@ -285,35 +284,65 @@ object PackageMapper {
         val pm = context.packageManager
         val results = mutableListOf<Pair<String, String>>()
 
-        // Method 1: Query all launcher activities
+        // Method 1: All installed applications (PRIMARY — this is what finds 90 apps)
         try {
-            val intent = Intent(Intent.ACTION_MAIN).apply {
-                addCategory(Intent.CATEGORY_LAUNCHER)
-            }
-            val apps: List<ResolveInfo> = pm.queryIntentActivities(intent, 0)
-            for (info in apps) {
+            val apps = pm.getInstalledApplications(0)
+            for (appInfo in apps) {
                 try {
-                    val label = normalizeLabel(info.loadLabel(pm).toString())
-                    val pkg = info.activityInfo.packageName
-                    if (results.none { it.second == pkg }) {
-                        results.add(Pair(label, pkg))
+                    val pkg = appInfo.packageName
+                    val launchIntent = pm.getLaunchIntentForPackage(pkg)
+                    if (launchIntent != null) {
+                        val label = pm.getApplicationLabel(appInfo)
+                            .toString()
+                            .lowercase(Locale.getDefault())
+                            .trim()
+                        if (results.none { it.second == pkg }) {
+                            results.add(Pair(label, pkg))
+                        }
                     }
                 } catch (e: Exception) {
-                    // ignore
+                    // ignore unreadable apps
                 }
             }
         } catch (e: Exception) {
-            Log.e(TAG, "Error querying launcher apps", e)
+            Log.e(TAG, "Error querying installed applications", e)
         }
 
-        // Method 2: Query any MAIN activity (catches edge-case OEM apps)
+        // Method 2: Launcher category (fallback)
+        if (results.size < 50) {
+            try {
+                val intent = Intent(Intent.ACTION_MAIN).apply {
+                    addCategory(Intent.CATEGORY_LAUNCHER)
+                }
+                val apps: List<ResolveInfo> = pm.queryIntentActivities(intent, 0)
+                for (info in apps) {
+                    try {
+                        val label = info.loadLabel(pm).toString()
+                            .lowercase(Locale.getDefault())
+                            .trim()
+                        val pkg = info.activityInfo.packageName
+                        if (results.none { it.second == pkg }) {
+                            results.add(Pair(label, pkg))
+                        }
+                    } catch (e: Exception) {
+                        // ignore
+                    }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error querying launcher apps", e)
+            }
+        }
+
+        // Method 3: All main activities (fallback)
         if (results.size < 50) {
             try {
                 val intent = Intent(Intent.ACTION_MAIN)
                 val apps: List<ResolveInfo> = pm.queryIntentActivities(intent, 0)
                 for (info in apps) {
                     try {
-                        val label = normalizeLabel(info.loadLabel(pm).toString())
+                        val label = info.loadLabel(pm).toString()
+                            .lowercase(Locale.getDefault())
+                            .trim()
                         val pkg = info.activityInfo.packageName
                         if (results.none { it.second == pkg }) {
                             results.add(Pair(label, pkg))
@@ -327,42 +356,10 @@ object PackageMapper {
             }
         }
 
-        // Method 3: Deep scan using getInstalledPackages
-        if (results.size < 50) {
-            try {
-                val packages = pm.getInstalledPackages(0)
-                for (packageInfo in packages) {
-                    try {
-                        val pkg = packageInfo.packageName
-                        if (results.any { it.second == pkg }) continue
-
-                        val launchIntent = pm.getLaunchIntentForPackage(pkg)
-                        if (launchIntent != null) {
-                            val appInfo = packageInfo.applicationInfo
-                            if (appInfo != null) {
-                                val label = normalizeLabel(pm.getApplicationLabel(appInfo).toString())
-                                results.add(Pair(label, pkg))
-                            }
-                        }
-                    } catch (e: Exception) {
-                        // ignore
-                    }
-                }
-            } catch (e: Exception) {
-                Log.e(TAG, "Error deep scanning packages", e)
-            }
-        }
-
         cachedApps = results.distinctBy { it.second }
         cacheTimestamp = now
         Log.d(TAG, "Cached ${cachedApps!!.size} apps")
         return cachedApps!!
-    }
-
-    private fun normalizeLabel(label: String): String {
-        return label.lowercase(Locale.getDefault()).trim()
-            .replace(Regex("[^a-z0-9 ]"), " ")
-            .replace(Regex("\\s+"), " ")
     }
 
     fun refreshCache(context: Context): List<Pair<String, String>> {
