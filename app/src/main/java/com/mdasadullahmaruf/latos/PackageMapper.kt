@@ -3,20 +3,17 @@ package com.mdasadullahmaruf.latos
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.util.Log
 
-/**
- * FIXED PackageMapper - more robust app discovery
- * Caches app list, better matching, handles OriginOS quirks
- */
 object PackageMapper {
 
-    // Cache to avoid scanning every time
+    private val TAG = "LatOS_PackageMapper"
+
     private var cachedApps: List<Pair<String, String>>? = null
     private var cacheTimestamp: Long = 0
-    private val CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+    private val CACHE_TTL = 5 * 60 * 1000
 
     private val knownApps = mapOf(
-        // Google Apps
         "google" to "com.google.android.googlequicksearchbox",
         "google search" to "com.google.android.googlequicksearchbox",
         "youtube" to "com.google.android.youtube",
@@ -41,8 +38,6 @@ object PackageMapper {
         "chrome" to "com.android.chrome",
         "google chrome" to "com.android.chrome",
         "google assistant" to "com.google.android.googlequicksearchbox",
-
-        // Social & Messaging
         "whatsapp" to "com.whatsapp",
         "instagram" to "com.instagram.android",
         "facebook" to "com.facebook.katana",
@@ -59,16 +54,12 @@ object PackageMapper {
         "pinterest" to "com.pinterest",
         "reddit" to "com.reddit.frontpage",
         "threads" to "com.instagram.barcelona",
-
-        // Phone & SMS
         "phone" to "com.android.dialer",
         "dialer" to "com.android.dialer",
         "contacts" to "com.android.contacts",
         "messages" to "com.android.messaging",
         "message" to "com.android.messaging",
         "sms" to "com.android.messaging",
-
-        // System Apps - Vivo/OriginOS specific
         "gallery" to "com.vivo.gallery",
         "albums" to "com.vivo.gallery",
         "browser" to "com.vivo.browser",
@@ -91,8 +82,6 @@ object PackageMapper {
         "v-appstore" to "com.vivo.appstore",
         "simple view" to "com.vivo.simplelauncher",
         "smart remote" to "com.vivo.vhome",
-
-        // Streaming
         "netflix" to "com.netflix.mediaclient",
         "spotify" to "com.spotify.music",
         "hotstar" to "in.startv.hotstar",
@@ -103,8 +92,6 @@ object PackageMapper {
         "amazon" to "com.amazon.mShop.android.shopping",
         "mx player" to "com.mxtech.videoplayer.ad",
         "vlc" to "org.videolan.vlc",
-
-        // Productivity
         "zoom" to "us.zoom.videomeetings",
         "teams" to "com.microsoft.teams",
         "microsoft teams" to "com.microsoft.teams",
@@ -119,19 +106,13 @@ object PackageMapper {
         "edge" to "com.microsoft.emmx",
         "docs" to "com.google.android.apps.docs.editors.docs",
         "tasks" to "com.google.android.apps.tasks",
-
-        // Shopping
         "flipkart" to "com.flipkart.android",
         "meesho" to "com.meesho.supply",
         "myntra" to "com.myntra.android",
-
-        // Payments
         "gpay" to "com.google.android.apps.nbu.paisa.user",
         "google pay" to "com.google.android.apps.nbu.paisa.user",
         "phonepe" to "com.phonepe.app",
         "paytm" to "net.one97.paytm",
-        
-        // Additional from Vivo screenshot
         "botim" to "im.thebot.messenger",
         "deepseek" to "com.deepseek.chat",
         "duolingo" to "com.duolingo",
@@ -150,76 +131,110 @@ object PackageMapper {
     )
 
     fun findPackage(context: Context, query: String): String? {
-        val q = query.lowercase().trim()
-            .replace(Regex("[^a-z0-9 ]"), " ")
-            .replace(Regex("\\s+"), " ")
-            .trim()
+        return try {
+            val q = query.lowercase().trim()
+                .replace(Regex("[^a-z0-9 ]"), " ")
+                .replace(Regex("\\s+"), " ")
+                .trim()
 
-        if (q.isEmpty()) return null
+            if (q.isEmpty()) {
+                Log.w(TAG, "Empty query")
+                return null
+            }
 
-        // 1. Exact match in known map (fastest)
-        knownApps[q]?.let { pkg ->
-            if (isInstalled(context, pkg)) return pkg
-        }
+            Log.d(TAG, "Finding package for query: '$q'")
 
-        // 2. Partial match in known map
-        for ((name, pkg) in knownApps) {
-            if (q == name || q.contains(name) || name.contains(q)) {
+            // 1. Exact match in known map
+            knownApps[q]?.let { pkg ->
+                Log.d(TAG, "Exact match in known map: $pkg")
                 if (isInstalled(context, pkg)) return pkg
             }
-        }
 
-        // 3. Scan ALL installed apps on device (with cache)
-        val allApps = getAllPackages(context)
-
-        // Exact label match
-        for ((label, pkg) in allApps) {
-            if (label == q) return pkg
-        }
-
-        // Label contains query
-        for ((label, pkg) in allApps) {
-            if (label.contains(q)) return pkg
-        }
-
-        // Query contains label (for partial matches)
-        for ((label, pkg) in allApps) {
-            if (q.contains(label) && label.length > 2) return pkg
-        }
-
-        // Package name contains query
-        for ((_, pkg) in allApps) {
-            val pkgLower = pkg.lowercase()
-            if (pkgLower.contains(q.replace(" ", ""))) return pkg
-            val lastPart = pkgLower.substringAfterLast(".")
-            if (lastPart.contains(q.replace(" ", ""))) return pkg
-        }
-
-        // 4. Fuzzy Levenshtein - catch typos
-        var bestPkg: String? = null
-        var bestDist = Int.MAX_VALUE
-        for ((label, pkg) in allApps) {
-            if (label.length < 3) continue // Skip very short labels
-            val dist = levenshtein(q, label)
-            if (dist < bestDist && dist <= 3) {
-                bestDist = dist
-                bestPkg = pkg
+            // 2. Partial match in known map
+            for ((name, pkg) in knownApps) {
+                if (q == name || q.contains(name) || name.contains(q)) {
+                    Log.d(TAG, "Partial match: '$name' -> $pkg")
+                    if (isInstalled(context, pkg)) return pkg
+                }
             }
+
+            // 3. Scan ALL installed apps on device (with cache)
+            val allApps = getAllPackages(context)
+            Log.d(TAG, "Scanned ${allApps.size} apps, searching for '$q'")
+
+            // Exact label match
+            for ((label, pkg) in allApps) {
+                if (label == q) {
+                    Log.d(TAG, "Exact label match: '$label' -> $pkg")
+                    return pkg
+                }
+            }
+
+            // Label contains query
+            for ((label, pkg) in allApps) {
+                if (label.contains(q)) {
+                    Log.d(TAG, "Label contains query: '$label' -> $pkg")
+                    return pkg
+                }
+            }
+
+            // Query contains label
+            for ((label, pkg) in allApps) {
+                if (q.contains(label) && label.length > 2) {
+                    Log.d(TAG, "Query contains label: '$label' -> $pkg")
+                    return pkg
+                }
+            }
+
+            // Package name contains query
+            for ((_, pkg) in allApps) {
+                val pkgLower = pkg.lowercase()
+                val queryNoSpace = q.replace(" ", "")
+                if (pkgLower.contains(queryNoSpace)) {
+                    Log.d(TAG, "Package contains query: $pkg")
+                    return pkg
+                }
+                val lastPart = pkgLower.substringAfterLast(".")
+                if (lastPart.contains(queryNoSpace)) {
+                    Log.d(TAG, "Package last part matches: $pkg")
+                    return pkg
+                }
+            }
+
+            // 4. Fuzzy Levenshtein
+            var bestPkg: String? = null
+            var bestDist = Int.MAX_VALUE
+            for ((label, pkg) in allApps) {
+                if (label.length < 3) continue
+                val dist = levenshtein(q, label)
+                if (dist < bestDist && dist <= 3) {
+                    bestDist = dist
+                    bestPkg = pkg
+                }
+            }
+            if (bestPkg != null) {
+                Log.d(TAG, "Fuzzy match (dist=$bestDist): $bestPkg")
+            } else {
+                Log.w(TAG, "No match found for '$q'")
+            }
+            bestPkg
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error finding package for '$query'", e)
+            null
         }
-        return bestPkg
     }
 
-    // Get cached or fresh app list
     fun getAllPackages(context: Context): List<Pair<String, String>> {
         val now = System.currentTimeMillis()
         if (cachedApps != null && (now - cacheTimestamp) < CACHE_TTL) {
+            Log.d(TAG, "Using cached app list (${cachedApps!!.size} apps)")
             return cachedApps!!
         }
 
         val pm = context.packageManager
         val results = mutableListOf<Pair<String, String>>()
 
-        // Method 1: Launcher apps (most reliable)
         try {
             val intent = Intent(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
@@ -236,9 +251,10 @@ object PackageMapper {
                     }
                 } catch (e: Exception) { }
             }
-        } catch (e: Exception) { }
+        } catch (e: Exception) {
+            Log.e(TAG, "Error querying launcher apps", e)
+        }
 
-        // Method 2: All installed apps (fallback)
         if (results.isEmpty()) {
             try {
                 pm.getInstalledApplications(PackageManager.GET_META_DATA)
@@ -257,15 +273,17 @@ object PackageMapper {
                             }
                         } catch (e: Exception) { }
                     }
-            } catch (e: Exception) { }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error querying installed apps", e)
+            }
         }
 
         cachedApps = results.distinctBy { it.second }
         cacheTimestamp = now
+        Log.d(TAG, "Cached ${cachedApps!!.size} apps")
         return cachedApps!!
     }
 
-    // Force refresh cache
     fun refreshCache(context: Context): List<Pair<String, String>> {
         cachedApps = null
         return getAllPackages(context)
