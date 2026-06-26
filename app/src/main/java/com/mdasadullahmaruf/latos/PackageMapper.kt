@@ -4,383 +4,389 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.content.pm.ResolveInfo
-import android.os.Build
+import android.util.Log
 import java.util.Locale
 
-class PackageMapper(private val context: Context) {
+object PackageMapper {
 
-    private val packageManager = context.packageManager
-    private val appMap = mutableMapOf<String, String>()       // normalized name -> package
-    private val packageToNameMap = mutableMapOf<String, String>() // package -> normalized name
-    private val aliases = mutableMapOf<String, String>()      // alias -> package
+    private val TAG = "LatOS_PackageMapper"
 
-    /**
-     * Full app scan. Uses intent queries (Play-Store-safe, no QUERY_ALL_PACKAGES needed)
-     * as the primary source, then falls back to package enumeration.
-     */
-    fun scanApps() {
-        appMap.clear()
-        packageToNameMap.clear()
-        aliases.clear()
+    private var cachedApps: List<Pair<String, String>>? = null
+    private var cacheTimestamp: Long = 0
+    private val CACHE_TTL = 5 * 60 * 1000
 
-        // Primary: all launcher activities — works without QUERY_ALL_PACKAGES
-        scanLauncherApps()
+    private val knownApps = mapOf(
+        "google" to "com.google.android.googlequicksearchbox",
+        "google search" to "com.google.android.googlequicksearchbox",
+        "youtube" to "com.google.android.youtube",
+        "youtube music" to "com.google.android.apps.youtube.music",
+        "gmail" to "com.google.android.gm",
+        "google maps" to "com.google.android.apps.maps",
+        "maps" to "com.google.android.apps.maps",
+        "google drive" to "com.google.android.apps.docs",
+        "drive" to "com.google.android.apps.docs",
+        "google photos" to "com.google.android.apps.photos",
+        "photos" to "com.google.android.apps.photos",
+        "google meet" to "com.google.android.apps.meetings",
+        "meet" to "com.google.android.apps.meetings",
+        "google calendar" to "com.google.android.calendar",
+        "calendar" to "com.google.android.calendar",
+        "google translate" to "com.google.android.apps.translate",
+        "translate" to "com.google.android.apps.translate",
+        "play store" to "com.android.vending",
+        "google play" to "com.android.vending",
+        "app store" to "com.android.vending",
+        "gemini" to "com.google.android.apps.bard",
+        "google gemini" to "com.google.android.apps.bard",
+        "chrome" to "com.android.chrome",
+        "google chrome" to "com.android.chrome",
+        "google assistant" to "com.google.android.googlequicksearchbox",
+        "whatsapp" to "com.whatsapp",
+        "instagram" to "com.instagram.android",
+        "facebook" to "com.facebook.katana",
+        "messenger" to "com.facebook.orca",
+        "facebook messenger" to "com.facebook.orca",
+        "twitter" to "com.twitter.android",
+        "x" to "com.twitter.android",
+        "snapchat" to "com.snapchat.android",
+        "tiktok" to "com.zhiliaoapp.musically",
+        "linkedin" to "com.linkedin.android",
+        "telegram" to "org.telegram.messenger",
+        "discord" to "com.discord",
+        "signal" to "org.thoughtcrime.securesms",
+        "pinterest" to "com.pinterest",
+        "reddit" to "com.reddit.frontpage",
+        "threads" to "com.instagram.barcelona",
+        "phone" to "com.android.dialer",
+        "dialer" to "com.android.dialer",
+        "contacts" to "com.android.contacts",
+        "messages" to "com.android.messaging",
+        "message" to "com.android.messaging",
+        "sms" to "com.android.messaging",
+        "gallery" to "com.vivo.gallery",
+        "albums" to "com.vivo.gallery",
+        "browser" to "com.vivo.browser",
+        "calculator" to "com.vivo.calculator",
+        "camera" to "com.android.camera",
+        "clock" to "com.android.deskclock",
+        "alarm" to "com.android.deskclock",
+        "file manager" to "com.android.filemanager",
+        "files" to "com.android.filemanager",
+        "music" to "com.android.bbkmusic",
+        "settings" to "com.android.settings",
+        "weather" to "com.vivo.weather",
+        "notes" to "com.vivo.notes",
+        "recorder" to "com.vivo.soundrecorder",
+        "compass" to "com.vivo.compass",
+        "easyshare" to "com.vivo.easyshare",
+        "tips" to "com.vivo.Tips",
+        "vivo store" to "com.vivo.website",
+        "v-appstore" to "com.vivo.appstore",
+        "simple view" to "com.vivo.simplelauncher",
+        "smart remote" to "com.vivo.vhome",
+        "netflix" to "com.netflix.mediaclient",
+        "spotify" to "com.spotify.music",
+        "hotstar" to "in.startv.hotstar",
+        "disney" to "in.startv.hotstar",
+        "disney hotstar" to "in.startv.hotstar",
+        "prime video" to "com.amazon.avod.thirdpartyclient",
+        "amazon prime" to "com.amazon.avod.thirdpartyclient",
+        "amazon" to "com.amazon.mShop.android.shopping",
+        "mx player" to "com.mxtech.videoplayer.ad",
+        "vlc" to "org.videolan.vlc",
+        "zoom" to "us.zoom.videomeetings",
+        "teams" to "com.microsoft.teams",
+        "microsoft teams" to "com.microsoft.teams",
+        "outlook" to "com.microsoft.office.outlook",
+        "slack" to "com.Slack",
+        "notion" to "notion.id",
+        "claude" to "com.anthropic.claude",
+        "chatgpt" to "com.openai.chatgpt",
+        "brave" to "com.brave.browser",
+        "opera" to "com.opera.browser",
+        "firefox" to "org.mozilla.firefox",
+        "edge" to "com.microsoft.emmx",
+        "docs" to "com.google.android.apps.docs.editors.docs",
+        "tasks" to "com.google.android.apps.tasks",
+        "flipkart" to "com.flipkart.android",
+        "meesho" to "com.meesho.supply",
+        "myntra" to "com.myntra.android",
+        "gpay" to "com.google.android.apps.nbu.paisa.user",
+        "google pay" to "com.google.android.apps.nbu.paisa.user",
+        "phonepe" to "com.phonepe.app",
+        "paytm" to "net.one97.paytm",
+        "botim" to "im.thebot.messenger",
+        "deepseek" to "com.deepseek.chat",
+        "duolingo" to "com.duolingo",
+        "moveon" to "com.moveon.global",
+        "qcy" to "com.qcymall.googleearphonesetup",
+        "quran" to "org.chromium.webapk.ad435df6874c797da_v2",
+        "uae pass" to "ae.uaepass.mainapp",
+        "uno" to "com.matteljv.uno",
+        "viking rise" to "com.igg.android.vikingriseglobal",
+        "smartlife" to "com.tuya.smartlife",
+        "switch access" to "com.google.android.accessibility.switchaccess",
+        "live transcribe" to "com.google.audio.hearing.visualization.accessibility.scribe",
+        "mi fitness" to "com.xiaomi.wearable",
+        "xiami earbuds" to "com.mi.earphone",
+        "the majestic reading" to "com.themajesticreading"
+    )
 
-        // Secondary: anything with ACTION_MAIN (catches edge-case OEM apps)
-        scanMainApps()
+    fun findPackage(context: Context, query: String): String? {
+        return try {
+            val q = query.lowercase(Locale.getDefault()).trim()
+                .replace(Regex("[^a-z0-9 ]"), " ")
+                .replace(Regex("\\s+"), " ")
+                .trim()
 
-        // Tertiary: brute-force scan if we can see the packages
-        scanAllPackages()
+            if (q.isEmpty()) {
+                Log.w(TAG, "Empty query")
+                return null
+            }
 
-        // Hardcoded aliases so "google", "youtube", etc. never map to the wrong app
-        addHardcodedAliases()
+            Log.d(TAG, "Finding package for query: '$q'")
 
-        // Remove self-reference so we don't accidentally open our own app
-        val self = context.packageName
-        appMap.entries.find { it.value == self }?.let { appMap.remove(it.key) }
-        packageToNameMap.remove(self)
+            // 1. Exact match in known map (highest priority)
+            knownApps[q]?.let { pkg ->
+                Log.d(TAG, "Exact match in known map: '$q' -> $pkg")
+                if (isInstalled(context, pkg)) return pkg
+            }
+
+            // 2. Scored match in known map (prevents "google" matching "google play")
+            val knownMatch = findBestKnownMatch(q)
+            if (knownMatch != null) {
+                Log.d(TAG, "Scored known match: '$q' -> $knownMatch")
+                if (isInstalled(context, knownMatch)) return knownMatch
+            }
+
+            // 3. Scan ALL installed apps on device (with cache)
+            val allApps = getAllPackages(context)
+            Log.d(TAG, "Scanned ${allApps.size} apps, searching for '$q'")
+
+            // Exact label match
+            for ((label, pkg) in allApps) {
+                if (label == q) {
+                    Log.d(TAG, "Exact label match: '$label' -> $pkg")
+                    return pkg
+                }
+            }
+
+            // Label starts with query (prefix match)
+            for ((label, pkg) in allApps) {
+                if (label.startsWith(q)) {
+                    Log.d(TAG, "Prefix match: '$label' -> $pkg")
+                    return pkg
+                }
+            }
+
+            // Whole word match
+            val wordRegex = Regex("""(^|\s)${Regex.escape(q)}($|\s)""")
+            for ((label, pkg) in allApps) {
+                if (wordRegex.containsMatchIn(label)) {
+                    Log.d(TAG, "Whole word match: '$label' -> $pkg")
+                    return pkg
+                }
+            }
+
+            // Label contains query
+            for ((label, pkg) in allApps) {
+                if (label.contains(q)) {
+                    Log.d(TAG, "Label contains query: '$label' -> $pkg")
+                    return pkg
+                }
+            }
+
+            // Query contains label (for multi-word queries)
+            for ((label, pkg) in allApps) {
+                if (q.contains(label) && label.length > 2) {
+                    Log.d(TAG, "Query contains label: '$label' -> $pkg")
+                    return pkg
+                }
+            }
+
+            // Package name contains query
+            for ((_, pkg) in allApps) {
+                val pkgLower = pkg.lowercase(Locale.getDefault())
+                val queryNoSpace = q.replace(" ", "")
+                if (pkgLower.contains(queryNoSpace)) {
+                    Log.d(TAG, "Package contains query: $pkg")
+                    return pkg
+                }
+                val lastPart = pkgLower.substringAfterLast(".")
+                if (lastPart.contains(queryNoSpace)) {
+                    Log.d(TAG, "Package last part matches: $pkg")
+                    return pkg
+                }
+            }
+
+            // 4. Fuzzy Levenshtein
+            var bestPkg: String? = null
+            var bestDist = Int.MAX_VALUE
+            for ((label, pkg) in allApps) {
+                if (label.length < 3) continue
+                val dist = levenshtein(q, label)
+                if (dist < bestDist && dist <= 3) {
+                    bestDist = dist
+                    bestPkg = pkg
+                }
+            }
+            if (bestPkg != null) {
+                Log.d(TAG, "Fuzzy match (dist=$bestDist): $bestPkg")
+            } else {
+                Log.w(TAG, "No match found for '$q'")
+            }
+            bestPkg
+
+        } catch (e: Exception) {
+            Log.e(TAG, "Error finding package for '$query'", e)
+            null
+        }
     }
 
-    private fun scanLauncherApps() {
+    /**
+     * Finds the best known app match using scoring to prevent substring false positives.
+     * "google" should match "google" (score 1000) not "google play" (score 50).
+     */
+    private fun findBestKnownMatch(query: String): String? {
+        var bestPkg: String? = null
+        var bestScore = -1
+
+        for ((name, pkg) in knownApps) {
+            val score = when {
+                name == query -> 1000
+                name.startsWith(query) -> 500 + (100 / (name.length - query.length + 1))
+                name.contains(query) -> {
+                    // Penalize if query is just a substring of a longer word
+                    val idx = name.indexOf(query)
+                    val isWordBoundary = (idx == 0 || name[idx - 1] == ' ') &&
+                            (idx + query.length == name.length || name[idx + query.length] == ' ')
+                    if (isWordBoundary) 300 else 50
+                }
+                query.contains(name) -> 200
+                else -> 0
+            }
+
+            if (score > bestScore) {
+                bestScore = score
+                bestPkg = pkg
+            }
+        }
+
+        return if (bestScore >= 200) bestPkg else null
+    }
+
+    @Suppress("DEPRECATION")
+    fun getAllPackages(context: Context): List<Pair<String, String>> {
+        val now = System.currentTimeMillis()
+        if (cachedApps != null && (now - cacheTimestamp) < CACHE_TTL) {
+            Log.d(TAG, "Using cached app list (${cachedApps!!.size} apps)")
+            return cachedApps!!
+        }
+
+        val pm = context.packageManager
+        val results = mutableListOf<Pair<String, String>>()
+
+        // Method 1: Query all launcher activities (standard, works on all Android versions)
         try {
             val intent = Intent(Intent.ACTION_MAIN).apply {
                 addCategory(Intent.CATEGORY_LAUNCHER)
             }
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_ALL.toLong())
-            } else {
-                @Suppress("DEPRECATION")
-                PackageManager.MATCH_ALL
-            }
-            val apps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                packageManager.queryIntentActivities(intent, flags)
-            } else {
-                @Suppress("DEPRECATION")
-                packageManager.queryIntentActivities(intent, flags)
-            }
-            for (resolveInfo in apps) {
-                addResolveInfo(resolveInfo)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun scanMainApps() {
-        try {
-            val intent = Intent(Intent.ACTION_MAIN)
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                PackageManager.ResolveInfoFlags.of(PackageManager.MATCH_ALL.toLong())
-            } else {
-                @Suppress("DEPRECATION")
-                PackageManager.MATCH_ALL
-            }
-            val apps = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                packageManager.queryIntentActivities(intent, flags)
-            } else {
-                @Suppress("DEPRECATION")
-                packageManager.queryIntentActivities(intent, flags)
-            }
-            for (resolveInfo in apps) {
-                addResolveInfo(resolveInfo)
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun scanAllPackages() {
-        // Fallback: requires QUERY_ALL_PACKAGES on Android 11+ to see everything,
-        // but system apps and apps we interact with will still show up.
-        try {
-            val flags = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                PackageManager.PackageInfoFlags.of(PackageManager.GET_ACTIVITIES.toLong())
-            } else {
-                @Suppress("DEPRECATION")
-                PackageManager.GET_ACTIVITIES
-            }
-            val packages = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                packageManager.getInstalledPackages(flags)
-            } else {
-                @Suppress("DEPRECATION")
-                packageManager.getInstalledPackages(flags)
-            }
-            for (packageInfo in packages) {
-                val packageName = packageInfo.packageName
-                if (packageName in packageToNameMap) continue
-
-                val launchIntent = packageManager.getLaunchIntentForPackage(packageName)
-                if (launchIntent != null) {
-                    try {
-                        val label = packageManager.getApplicationLabel(packageInfo.applicationInfo)
-                            .toString()
-                            .lowercase(Locale.getDefault())
-                            .trim()
-                        if (label.isNotBlank()) {
-                            appMap[label] = packageName
-                            packageToNameMap[packageName] = label
-                        }
-                    } catch (e: Exception) {
-                        // ignore unreadable labels
+            val apps: List<ResolveInfo> = pm.queryIntentActivities(intent, PackageManager.MATCH_ALL)
+            for (info in apps) {
+                try {
+                    val label = normalizeLabel(info.loadLabel(pm).toString())
+                    val pkg = info.activityInfo.packageName
+                    if (results.none { it.second == pkg }) {
+                        results.add(Pair(label, pkg))
                     }
-                }
+                } catch (e: Exception) { }
             }
         } catch (e: Exception) {
-            e.printStackTrace()
+            Log.e(TAG, "Error querying launcher apps", e)
         }
-    }
 
-    private fun addResolveInfo(resolveInfo: ResolveInfo) {
-        try {
-            val packageName = resolveInfo.activityInfo.packageName
-            val label = resolveInfo.loadLabel(packageManager)
-                .toString()
-                .lowercase(Locale.getDefault())
-                .trim()
-
-            if (label.isBlank()) return
-
-            // If we already have this package, keep the shorter label (usually the real app name,
-            // not an activity-specific name like "YouTube Main Activity")
-            val existingLabel = packageToNameMap[packageName]
-            if (existingLabel == null || label.length < existingLabel.length) {
-                existingLabel?.let { appMap.remove(it) }
-                appMap[label] = packageName
-                packageToNameMap[packageName] = label
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-    }
-
-    private fun addHardcodedAliases() {
-        val known = mapOf(
-            "google" to listOf(
-                "com.google.android.googlequicksearchbox",
-                "com.android.chrome"
-            ),
-            "chrome" to listOf("com.android.chrome"),
-            "youtube" to listOf("com.google.android.youtube"),
-            "maps" to listOf("com.google.android.apps.maps"),
-            "google maps" to listOf("com.google.android.apps.maps"),
-            "messages" to listOf("com.google.android.apps.messaging"),
-            "phone" to listOf("com.google.android.dialer"),
-            "photos" to listOf("com.google.android.apps.photos"),
-            "gallery" to listOf("com.vivo.gallery", "com.google.android.apps.photos"),
-            "play store" to listOf("com.android.vending"),
-            "google play" to listOf("com.android.vending"),
-            "app store" to listOf("com.android.vending"),
-            "browser" to listOf("com.vivo.browser", "com.android.chrome"),
-            "calculator" to listOf(
-                "com.vivo.calculator",
-                "com.google.android.calculator",
-                "com.android.calculator2"
-            ),
-            "camera" to listOf(
-                "com.android.camera",
-                "com.vivo.camera",
-                "com.google.android.GoogleCamera"
-            ),
-            "clock" to listOf("com.android.deskclock", "com.google.android.deskclock"),
-            "settings" to listOf("com.android.settings"),
-            "whatsapp" to listOf("com.whatsapp"),
-            "claude" to listOf("com.anthropic.claude"),
-            "deepseek" to listOf("com.deepseek.chat"),
-            "file manager" to listOf(
-                "com.android.filemanager",
-                "com.google.android.apps.nbu.files"
-            ),
-            "music" to listOf(
-                "com.android.bbkmusic",
-                "com.vivo.music",
-                "com.google.android.music"
-            ),
-            "notes" to listOf("com.vivo.notes", "com.google.android.keep"),
-            "recorder" to listOf("com.vivo.soundrecorder", "com.android.soundrecorder"),
-            "contacts" to listOf("com.android.contacts", "com.google.android.contacts"),
-            "gmail" to listOf("com.google.android.gm"),
-            "drive" to listOf("com.google.android.apps.docs"),
-            "calendar" to listOf("com.google.android.calendar", "com.android.calendar"),
-            "weather" to listOf("com.vivo.weather", "com.google.android.apps.weather"),
-            "compass" to listOf("com.vivo.compass"),
-            "feedback" to listOf("com.vivo.feedback"),
-            "easyshare" to listOf("com.vivo.easyshare"),
-            "imanager" to listOf("com.vivo.imanager"),
-            "lock" to listOf("com.android.bbk.lockscreen3"),
-            "simple view" to listOf("com.vivo.simplelauncher"),
-            "smart remote" to listOf("com.vivo.vhome"),
-            "digital wellbeing" to listOf("com.google.android.apps.wellbeing")
-        )
-
-        for ((alias, candidates) in known) {
-            for (pkg in candidates) {
-                if (isPackageInstalled(pkg)) {
-                    aliases[alias] = pkg
-                    // Also ensure the canonical name is in the main map
+        // Method 2: Query any MAIN activity (catches apps without CATEGORY_LAUNCHER)
+        if (results.size < 50) {
+            try {
+                val intent = Intent(Intent.ACTION_MAIN)
+                val apps: List<ResolveInfo> = pm.queryIntentActivities(intent, PackageManager.MATCH_ALL)
+                for (info in apps) {
                     try {
-                        val appInfo = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                            packageManager.getApplicationInfo(
-                                pkg,
-                                PackageManager.ApplicationInfoFlags.of(0)
-                            )
-                        } else {
-                            @Suppress("DEPRECATION")
-                            packageManager.getApplicationInfo(pkg, 0)
+                        val label = normalizeLabel(info.loadLabel(pm).toString())
+                        val pkg = info.activityInfo.packageName
+                        if (results.none { it.second == pkg }) {
+                            results.add(Pair(label, pkg))
                         }
-                        val label = packageManager.getApplicationLabel(appInfo)
-                            .toString()
-                            .lowercase(Locale.getDefault())
-                            .trim()
-                        if (label.isNotBlank()) {
-                            appMap[label] = pkg
-                            packageToNameMap[pkg] = label
-                        }
-                    } catch (e: Exception) {
-                        appMap[alias] = pkg
-                        packageToNameMap[pkg] = alias
-                    }
-                    break // use first available candidate
+                    } catch (e: Exception) { }
                 }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error querying MAIN apps", e)
             }
         }
+
+        // Method 3: Deep scan using getInstalledPackages (may be restricted on Android 11+)
+        if (results.size < 50) {
+            try {
+                val packages = pm.getInstalledPackages(PackageManager.GET_ACTIVITIES)
+                for (packageInfo in packages) {
+                    try {
+                        val pkg = packageInfo.packageName
+                        if (results.any { it.second == pkg }) continue
+
+                        val launchIntent = pm.getLaunchIntentForPackage(pkg)
+                        if (launchIntent != null) {
+                            val label = normalizeLabel(pm.getApplicationLabel(packageInfo.applicationInfo).toString())
+                            results.add(Pair(label, pkg))
+                        }
+                    } catch (e: Exception) { }
+                }
+            } catch (e: Exception) {
+                Log.e(TAG, "Error deep scanning packages", e)
+            }
+        }
+
+        cachedApps = results.distinctBy { it.second }
+        cacheTimestamp = now
+        Log.d(TAG, "Cached ${cachedApps!!.size} apps")
+        return cachedApps!!
     }
 
-    private fun isPackageInstalled(packageName: String): Boolean {
+    private fun normalizeLabel(label: String): String {
+        return label.lowercase(Locale.getDefault()).trim()
+            .replace(Regex("[^a-z0-9 ]"), " ")
+            .replace(Regex("\\s+"), " ")
+    }
+
+    fun refreshCache(context: Context): List<Pair<String, String>> {
+        cachedApps = null
+        return getAllPackages(context)
+    }
+
+    fun isInstalled(context: Context, packageName: String): Boolean {
         return try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                packageManager.getApplicationInfo(
-                    packageName,
-                    PackageManager.ApplicationInfoFlags.of(0)
-                )
-            } else {
-                @Suppress("DEPRECATION")
-                packageManager.getApplicationInfo(packageName, 0)
-            }
-            true
-        } catch (e: PackageManager.NameNotFoundException) {
+            context.packageManager.getLaunchIntentForPackage(packageName) != null
+        } catch (e: Exception) {
             false
         }
     }
 
-    /**
-     * Finds the best package for a query.
-     * Priority: alias -> exact name -> prefix -> whole-word -> contains -> package name.
-     */
-    fun findApp(query: String): String? {
-        val normalized = query.lowercase(Locale.getDefault()).trim()
-
-        // 1. Exact alias
-        aliases[normalized]?.let { return it }
-
-        // 2. Exact scanned name
-        appMap[normalized]?.let { return it }
-
-        // 3. Raw package name
-        if (isPackageInstalled(normalized)) return normalized
-
-        // 4. Score-based search
-        var bestPackage: String? = null
-        var bestScore = 0
-
-        for ((name, pkg) in appMap) {
-            val score = calculateScore(normalized, name, pkg)
-            if (score > bestScore) {
-                bestScore = score
-                bestPackage = pkg
-            }
-        }
-
-        // 5. Score against aliases too
-        for ((alias, pkg) in aliases) {
-            val score = calculateScore(normalized, alias, pkg)
-            if (score > bestScore) {
-                bestScore = score
-                bestPackage = pkg
-            }
-        }
-
-        return if (bestScore >= 50) bestPackage else null
+    fun getInstalledAppsList(context: Context): List<String> {
+        return getAllPackages(context).map { "${it.first} -> ${it.second}" }.sorted()
     }
 
-    private fun calculateScore(query: String, candidateName: String, packageName: String): Int {
-        // Exact match
-        if (candidateName == query) return 10000
-
-        // Starts with query (e.g. "youtube" vs "youtube music")
-        if (candidateName.startsWith(query)) {
-            return 600 + (100 / (candidateName.length - query.length + 1))
-        }
-
-        val candidateWords = candidateName.split(Regex("\\s+"))
-        val queryWords = query.split(Regex("\\s+"))
-
-        // Single word exact match
-        for (word in candidateWords) {
-            if (word == query) return 2000
-        }
-
-        var score = 0
-
-        // Whole word match
-        val wholeWord = Regex("""(^|\s)$query($|\s)""", RegexOption.IGNORE_CASE)
-        if (wholeWord.containsMatchIn(candidateName)) {
-            score += 500
-        }
-
-        // Contains query
-        if (candidateName.contains(query)) {
-            score += 150
-            val idx = candidateName.indexOf(query)
-            // Penalize if not a word boundary
-            if (idx > 0 && candidateName[idx - 1] != ' ') score -= 40
-            if (idx + query.length < candidateName.length && candidateName[idx + query.length] != ' ') {
-                score -= 40
-            }
-        }
-
-        // Package name match
-        if (packageName.contains(query)) {
-            score += 60
-        }
-
-        // Multi-word matching
-        var matchedWords = 0
-        for (qWord in queryWords) {
-            if (qWord.length <= 2) continue
-            for (cWord in candidateWords) {
-                when {
-                    cWord == qWord -> {
-                        score += 200
-                        matchedWords++
-                    }
-                    cWord.startsWith(qWord) -> {
-                        score += 100
-                        matchedWords++
-                    }
-                    cWord.contains(qWord) -> score += 50
+    private fun levenshtein(a: String, b: String): Int {
+        val dp = Array(a.length + 1) { IntArray(b.length + 1) }
+        for (i in 0..a.length) dp[i][0] = i
+        for (j in 0..b.length) dp[0][j] = j
+        for (i in 1..a.length) {
+            for (j in 1..b.length) {
+                dp[i][j] = if (a[i - 1] == b[j - 1]) {
+                    dp[i - 1][j - 1]
+                } else {
+                    1 + minOf(dp[i - 1][j], dp[i][j - 1], dp[i - 1][j - 1])
                 }
             }
         }
-
-        // Bonus if all significant query words matched
-        val significantWords = queryWords.count { it.length > 2 }
-        if (matchedWords > 0 && matchedWords >= significantWords) {
-            score += 300
-        }
-
-        // Penalize very short candidates that are just substring matches
-        if (candidateName.length < query.length + 3 && candidateName != query) {
-            score -= 60
-        }
-
-        return score
+        return dp[a.length][b.length]
     }
-
-    fun getAllApps(): Map<String, String> = appMap.toSortedMap()
-
-    fun getAppCount(): Int = appMap.size
-
-    fun getAppName(packageName: String): String? = packageToNameMap[packageName]
-
-    fun getAliases(): Map<String, String> = aliases.toMap()
 }
